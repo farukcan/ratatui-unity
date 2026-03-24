@@ -120,6 +120,28 @@ namespace RatatuiUnity
             return result;
         }
 
+        // ── Margin / Inner ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns a new area ID that represents the inside of <paramref name="areaId"/>
+        /// shrunk by the given margin on each side.
+        /// <para>
+        /// Typical usage: call after <see cref="Block"/> to get the area inside the border:
+        /// <code>
+        /// term.Block(area, "Title", Borders.All);
+        /// uint inner = term.Inner(area);          // 1 char inside borders
+        /// term.Paragraph(inner, "Hello");
+        /// </code>
+        /// Use <paramref name="horizontal"/> = 2 for one extra character of text padding on
+        /// left/right in addition to the border.
+        /// </para>
+        /// </summary>
+        public uint Inner(uint areaId, ushort horizontal = 1, ushort vertical = 1)
+        {
+            ThrowIfDisposed();
+            return RatatuiNative.ratatui_inner(_handle, areaId, horizontal, vertical);
+        }
+
         // ── Style ─────────────────────────────────────────────────────────────
 
         /// <summary>

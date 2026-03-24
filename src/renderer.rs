@@ -54,13 +54,12 @@ pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager) -> Vec<u
 
 // ─── Block element renderer ──────────────────────────────────────────────────
 
-/// Returns true for Unicode "Block Elements" (U+2580–U+259F) and related
-/// box-drawing / braille characters that ratatui uses in Gauge and Sparkline.
+/// Returns true only for Unicode "Block Elements" (U+2580–U+259F).
+/// Box-drawing characters (U+2500–U+257F) are intentionally excluded here
+/// and rendered via fontdue instead, which gives correct thickness and
+/// seamless connections between adjacent cells.
 fn is_block_element(ch: char) -> bool {
-    matches!(ch,
-        '\u{2580}'..='\u{259F}' | // Block Elements (▀ ▁ ▂ … █)
-        '\u{2500}'..='\u{257F}'   // Box Drawing (─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ …)
-    )
+    matches!(ch, '\u{2580}'..='\u{259F}')
 }
 
 /// Renders a block/box character by directly painting pixel rows — no font

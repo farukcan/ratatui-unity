@@ -117,6 +117,14 @@ namespace RatatuiUnity
             IntPtr handle, uint areaId,
             [MarshalAs(UnmanagedType.LPStr)] string data);
 
+        /// Returns a new area ID representing the inside of <paramref name="areaId"/> shrunk by
+        /// the given margin on each side.  Typical usage: horizontal=1, vertical=1 to get the
+        /// area inside a Block with Borders.All.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern uint ratatui_inner(
+            IntPtr handle, uint areaId,
+            ushort horizontal, ushort vertical);
+
         // Returns a pointer to a static string in the native lib — must NOT be freed.
         // Use Marshal.PtrToStringAnsi() without calling free.
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

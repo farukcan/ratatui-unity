@@ -353,6 +353,30 @@ pub extern "C" fn ratatui_table(
     });
 }
 
+/// Returns a new area ID representing the inside of `area_id` shrunk by the
+/// given margin on each side.  For a `Block` with `Borders::ALL` use
+/// `horizontal = 1, vertical = 1` to get the area inside the border.
+/// Returns `u32::MAX` if the handle or area is invalid.
+#[no_mangle]
+pub extern "C" fn ratatui_inner(
+    handle: *mut c_void,
+    area_id: u32,
+    horizontal: u16,
+    vertical: u16,
+) -> u32 {
+    if handle.is_null() {
+        return u32::MAX;
+    }
+    let state = unsafe { state_mut(handle) };
+    let area = match state.area_map.get(&area_id).copied() {
+        Some(r) => r,
+        None => return u32::MAX,
+    };
+    use ratatui::layout::Margin;
+    let inner = area.inner(Margin { horizontal, vertical });
+    state.register_area(inner)
+}
+
 /// Returns the library version string as a static C string (no allocation needed).
 #[no_mangle]
 pub extern "C" fn ratatui_version() -> *const c_char {
