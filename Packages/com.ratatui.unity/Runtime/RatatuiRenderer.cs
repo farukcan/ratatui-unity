@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -59,10 +60,14 @@ namespace RatatuiUnity
         {
             Terminal.BeginFrame();
             BuildFrame(Terminal);
-            byte[] pixels = Terminal.EndFrame();
-            if (pixels.Length > 0)
+
+            // Use the zero-copy path: read directly from the native pixel buffer
+            // pointer instead of marshalling into a managed byte[].
+            IntPtr ptr = Terminal.EndFrameRaw();
+            if (ptr != IntPtr.Zero)
             {
-                Texture.LoadRawTextureData(pixels);
+                int byteCount = Terminal.PixelWidth * Terminal.PixelHeight * 4;
+                Texture.LoadRawTextureData(ptr, byteCount);
                 Texture.Apply(updateMipmaps: false);
             }
         }

@@ -14,6 +14,11 @@ namespace RatatuiUnity
         private IntPtr _handle;
         private bool _disposed;
 
+        // Scratch arrays reused across Split() calls to avoid per-frame allocations.
+        private byte[]   _splitTypes  = new byte[8];
+        private ushort[] _splitValues = new ushort[8];
+        private uint[]   _splitOutIds = new uint[8];
+
         /// <summary>Width of the rendered texture in pixels.</summary>
         public int PixelWidth  { get; private set; }
 
@@ -74,15 +79,28 @@ namespace RatatuiUnity
         }
 
         /// <summary>
-        /// Execute all queued widget commands and return the RGBA32 pixel data.
-        /// Copy the returned array before calling any other method.
+        /// Execute all queued widget commands and return a direct pointer to the
+        /// native RGBA32 pixel buffer.  The pointer is valid until the next
+        /// <see cref="BeginFrame"/> call.  Byte count is <c>PixelWidth * PixelHeight * 4</c>.
+        /// Prefer this over <see cref="EndFrame"/> to avoid a managed byte[] allocation
+        /// every frame — pass the pointer directly to
+        /// <c>Texture2D.LoadRawTextureData(IntPtr, int)</c>.
+        /// </summary>
+        public IntPtr EndFrameRaw()
+        {
+            ThrowIfDisposed();
+            return RatatuiNative.ratatui_end_frame(_handle);
+        }
+
+        /// <summary>
+        /// Execute all queued widget commands and copy the RGBA32 pixel data into
+        /// a newly allocated <c>byte[]</c>.  Prefer <see cref="EndFrameRaw"/> to
+        /// avoid a ~1-2 MB GC allocation every frame.
         /// </summary>
         public byte[] EndFrame()
         {
-            ThrowIfDisposed();
-            IntPtr ptr = RatatuiNative.ratatui_end_frame(_handle);
+            IntPtr ptr = EndFrameRaw();
             if (ptr == IntPtr.Zero) return Array.Empty<byte>();
-
             int byteCount = PixelWidth * PixelHeight * 4;
             byte[] pixels = new byte[byteCount];
             Marshal.Copy(ptr, pixels, 0, byteCount);
@@ -102,21 +120,27 @@ namespace RatatuiUnity
                 return Array.Empty<uint>();
 
             int n = constraints.Length;
-            var types  = new byte[n];
-            var values = new ushort[n];
-            var outIds = new uint[n];
+
+            // Grow scratch arrays only when a larger split is encountered (rare).
+            if (n > _splitTypes.Length)
+            {
+                _splitTypes  = new byte[n];
+                _splitValues = new ushort[n];
+                _splitOutIds = new uint[n];
+            }
 
             for (int i = 0; i < n; i++)
             {
-                types[i]  = (byte)constraints[i].Type;
-                values[i] = constraints[i].Value;
+                _splitTypes[i]  = (byte)constraints[i].Type;
+                _splitValues[i] = constraints[i].Value;
             }
 
             uint produced = RatatuiNative.ratatui_split(
-                _handle, areaId, (byte)direction, types, values, (uint)n, outIds);
+                _handle, areaId, (byte)direction,
+                _splitTypes, _splitValues, (uint)n, _splitOutIds);
 
             var result = new uint[produced];
-            Array.Copy(outIds, result, produced);
+            Array.Copy(_splitOutIds, result, produced);
             return result;
         }
 
