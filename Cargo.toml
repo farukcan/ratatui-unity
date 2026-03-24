@@ -1,0 +1,17 @@
+[package]
+name = "ratatui_unity"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "ratatui_unity"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+ratatui = { version = "0.30", default-features = false }
+fontdue = "0.9"
+
+[profile.release]
+opt-level = "z"
+lto = true
+panic = "abort"

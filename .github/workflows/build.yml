@@ -1,0 +1,241 @@
+name: Build Native Plugin
+
+on:
+#  push:
+#    branches: [main]
+#    tags:     ["v*.*.*"]
+#  pull_request:
+#    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  PLUGINS: Packages/com.ratatui.unity/Plugins
+
+jobs:
+  # ── macOS + iOS ─────────────────────────────────────────────────────────────
+  build-macos-ios:
+    name: macOS + iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust targets
+        run: |
+          rustup target add \
+            aarch64-apple-darwin x86_64-apple-darwin \
+            aarch64-apple-ios    x86_64-apple-ios    \
+            aarch64-apple-ios-sim
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build macOS Universal
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          mkdir -p $PLUGINS/macOS
+          lipo -create \
+            target/aarch64-apple-darwin/release/libratatui_unity.dylib \
+            target/x86_64-apple-darwin/release/libratatui_unity.dylib \
+            -output $PLUGINS/macOS/libratatui_unity.bundle
+
+      - name: Build iOS XCFramework
+        run: |
+          cargo build --release --target aarch64-apple-ios
+          cargo build --release --target x86_64-apple-ios
+          cargo build --release --target aarch64-apple-ios-sim
+
+          lipo -create \
+            target/x86_64-apple-ios/release/libratatui_unity.a \
+            target/aarch64-apple-ios-sim/release/libratatui_unity.a \
+            -output target/libratatui_unity_sim.a
+
+          xcodebuild -create-xcframework \
+            -library target/aarch64-apple-ios/release/libratatui_unity.a \
+            -library target/libratatui_unity_sim.a \
+            -output $PLUGINS/iOS/ratatui_unity.xcframework
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-macos-ios
+          path: |
+            ${{ env.PLUGINS }}/macOS/
+            ${{ env.PLUGINS }}/iOS/
+
+  # ── Windows ─────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust target
+        run: rustup target add x86_64-pc-windows-msvc
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Windows DLL
+        run: |
+          cargo build --release --target x86_64-pc-windows-msvc
+          New-Item -ItemType Directory -Force -Path "$env:PLUGINS\Windows\x86_64"
+          Copy-Item "target\x86_64-pc-windows-msvc\release\ratatui_unity.dll" `
+                    "$env:PLUGINS\Windows\x86_64\"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-windows
+          path: ${{ env.PLUGINS }}/Windows/
+
+  # ── Linux + Android ─────────────────────────────────────────────────────────
+  build-linux-android:
+    name: Linux x86_64 + Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Install Rust targets
+        run: |
+          rustup target add \
+            x86_64-unknown-linux-gnu \
+            aarch64-linux-android    \
+            armv7-linux-androideabi  \
+            x86_64-linux-android
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Linux
+        run: |
+          cross build --release --target x86_64-unknown-linux-gnu
+          mkdir -p $PLUGINS/Linux/x86_64
+          cp target/x86_64-unknown-linux-gnu/release/libratatui_unity.so \
+             $PLUGINS/Linux/x86_64/
+
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android
+        run: |
+          NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_BIN/aarch64-linux-android30-clang" \
+            cargo build --release --target aarch64-linux-android
+
+          CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$NDK_BIN/armv7a-linux-androideabi30-clang" \
+            cargo build --release --target armv7-linux-androideabi
+
+          CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$NDK_BIN/x86_64-linux-android30-clang" \
+            cargo build --release --target x86_64-linux-android
+
+          mkdir -p \
+            $PLUGINS/Android/libs/arm64-v8a   \
+            $PLUGINS/Android/libs/armeabi-v7a  \
+            $PLUGINS/Android/libs/x86_64
+
+          cp target/aarch64-linux-android/release/libratatui_unity.so   $PLUGINS/Android/libs/arm64-v8a/
+          cp target/armv7-linux-androideabi/release/libratatui_unity.so  $PLUGINS/Android/libs/armeabi-v7a/
+          cp target/x86_64-linux-android/release/libratatui_unity.so     $PLUGINS/Android/libs/x86_64/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-linux-android
+          path: |
+            ${{ env.PLUGINS }}/Linux/
+            ${{ env.PLUGINS }}/Android/
+
+  # ── WebGL ────────────────────────────────────────────────────────────────────
+  build-webgl:
+    name: WebGL (Emscripten)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      - name: Install Rust target
+        run: rustup target add wasm32-unknown-emscripten
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-webgl-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build WebGL
+        run: |
+          EMCC_CFLAGS="-O3" cargo build --release --target wasm32-unknown-emscripten
+          mkdir -p $PLUGINS/WebGL
+          cp target/wasm32-unknown-emscripten/release/libratatui_unity.a $PLUGINS/WebGL/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-webgl
+          path: ${{ env.PLUGINS }}/WebGL/
+
+  # ── Release: assemble all artifacts ─────────────────────────────────────────
+  release:
+    name: Publish Release
+    needs: [build-macos-ios, build-windows, build-linux-android, build-webgl]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Assemble plugin zip
+        run: |
+          mkdir -p dist/Packages/com.ratatui.unity
+          cp -r Packages/com.ratatui.unity/Runtime   dist/Packages/com.ratatui.unity/
+          cp -r Packages/com.ratatui.unity/Samples~  dist/Packages/com.ratatui.unity/
+          cp    Packages/com.ratatui.unity/package.json   dist/Packages/com.ratatui.unity/
+          cp    Packages/com.ratatui.unity/link.xml        dist/Packages/com.ratatui.unity/
+
+          # Merge downloaded native binaries
+          mkdir -p dist/Packages/com.ratatui.unity/Plugins
+          for dir in artifacts/plugin-*/; do
+            cp -r "$dir"/* dist/Packages/com.ratatui.unity/Plugins/ 2>/dev/null || true
+          done
+          # Keep jslib
+          cp Packages/com.ratatui.unity/Plugins/WebGL/RatatuiPlugin.jslib \
+             dist/Packages/com.ratatui.unity/Plugins/WebGL/ 2>/dev/null || true
+
+          cd dist
+          zip -r ../ratatui-unity-${{ github.ref_name }}.zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ratatui-unity-${{ github.ref_name }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

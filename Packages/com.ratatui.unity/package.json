@@ -1,0 +1,27 @@
+{
+  "name": "com.ratatui.unity",
+  "version": "0.1.0",
+  "displayName": "Ratatui Unity",
+  "description": "Ratatui TUI framework rendered as RGBA pixel textures in Unity via a native Rust library. Supports Windows, macOS, Linux, iOS, Android, and WebGL.",
+  "unity": "2021.3",
+  "keywords": [
+    "ratatui",
+    "tui",
+    "terminal",
+    "texture",
+    "native",
+    "rust",
+    "plugin"
+  ],
+  "author": {
+    "name": "ratatui-unity contributors",
+    "url": "https://github.com/farukcan/ratatui-unity"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Usage",
+      "description": "Demonstrates block, paragraph, list, gauge, and tab widgets rendered to a RawImage texture.",
+      "path": "Samples~/BasicUsage"
+    }
+  ]
+}
