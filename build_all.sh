@@ -18,7 +18,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGINS="$SCRIPT_DIR/Packages/com.ratatui.unity/Plugins"
+PLUGINS="$SCRIPT_DIR/Packages/com.farukcan.ratatui.unity/Plugins"
 RELEASE="$SCRIPT_DIR/target"
 
 if [[ $# -eq 0 ]]; then

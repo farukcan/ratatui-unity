@@ -6,6 +6,8 @@ All notable changes to this package will be documented in this file.
 
 ### Fixed
 - Pixel buffer is now flipped vertically before upload so Unity's `Texture2D.LoadRawTextureData` (bottom-to-top / OpenGL row order) displays the terminal the right way up.
+- **Colors tab**: Left column was empty because two `BeginStyledParagraph` builders were created simultaneously; the FFI layer holds only one pending paragraph at a time so the second call overwrote the first. Builders are now created and rendered sequentially.
+- **Dashboard tab**: Sparkline was invisible on startup because the backing array was initialized to all-zeros. The array is now pre-filled with random values in the constructor.
 
 ## [0.2.0] - 2026-03-25
 

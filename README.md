@@ -19,7 +19,7 @@ ratatui-unity/
   build_all.sh                   ← Cross-compile script
   .github/workflows/build.yml    ← CI/CD (matrix build + release)
   Packages/
-    com.ratatui.unity/           ← Unity Package Manager package
+    com.farukcan.ratatui.unity/  ← Unity Package Manager package
       package.json
       Runtime/                   ← C# scripts + .asmdef
       Plugins/                   ← Native binaries (generated)
@@ -33,12 +33,12 @@ ratatui-unity/
 // Packages/manifest.json in your Unity project
 {
   "dependencies": {
-    "com.ratatui.unity": "https://github.com/<user>/ratatui-unity.git?path=Packages/com.ratatui.unity"
+    "com.farukcan.ratatui.unity": "https://github.com/<user>/ratatui-unity.git?path=Packages/com.farukcan.ratatui.unity"
   }
 }
 ```
 
-See [`Packages/com.ratatui.unity/README.md`](Packages/com.ratatui.unity/README.md) for full documentation.
+See [`Packages/com.farukcan.ratatui.unity/README.md`](Packages/com.farukcan.ratatui.unity/README.md) for full documentation.
 
 ## Building Native Binaries
 
@@ -54,5 +54,5 @@ See `build_all.sh` for platform-specific prerequisites (cross, Android NDK, Emsc
 
 ## License
 
-MIT — see [`Packages/com.ratatui.unity/LICENSE`](Packages/com.ratatui.unity/LICENSE).  
+MIT — see [`Packages/com.farukcan.ratatui.unity/LICENSE`](Packages/com.farukcan.ratatui.unity/LICENSE).  
 JetBrains Mono font: SIL Open Font License 1.1.

@@ -1,5 +1,5 @@
 {
-  "name": "com.ratatui.unity",
+  "name": "com.farukcan.ratatui.unity",
   "version": "0.1.0",
   "displayName": "Ratatui Unity",
   "description": "Ratatui TUI framework rendered as RGBA pixel textures in Unity via a native Rust library. Supports Windows, macOS, Linux, iOS, Android, and WebGL.",

@@ -9,7 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  PLUGINS: Packages/com.ratatui.unity/Plugins
+  PLUGINS: Packages/com.farukcan.ratatui.unity/Plugins
 
 jobs:
   # ── macOS + iOS ─────────────────────────────────────────────────────────────
@@ -214,20 +214,20 @@ jobs:
 
       - name: Assemble plugin zip
         run: |
-          mkdir -p dist/Packages/com.ratatui.unity
-          cp -r Packages/com.ratatui.unity/Runtime   dist/Packages/com.ratatui.unity/
-          cp -r Packages/com.ratatui.unity/Samples~  dist/Packages/com.ratatui.unity/
-          cp    Packages/com.ratatui.unity/package.json   dist/Packages/com.ratatui.unity/
-          cp    Packages/com.ratatui.unity/link.xml        dist/Packages/com.ratatui.unity/
+          mkdir -p dist/Packages/com.farukcan.ratatui.unity
+          cp -r Packages/com.farukcan.ratatui.unity/Runtime   dist/Packages/com.farukcan.ratatui.unity/
+          cp -r Packages/com.farukcan.ratatui.unity/Samples~  dist/Packages/com.farukcan.ratatui.unity/
+          cp    Packages/com.farukcan.ratatui.unity/package.json   dist/Packages/com.farukcan.ratatui.unity/
+          cp    Packages/com.farukcan.ratatui.unity/link.xml        dist/Packages/com.farukcan.ratatui.unity/
 
           # Merge downloaded native binaries
-          mkdir -p dist/Packages/com.ratatui.unity/Plugins
+          mkdir -p dist/Packages/com.farukcan.ratatui.unity/Plugins
           for dir in artifacts/plugin-*/; do
-            cp -r "$dir"/* dist/Packages/com.ratatui.unity/Plugins/ 2>/dev/null || true
+            cp -r "$dir"/* dist/Packages/com.farukcan.ratatui.unity/Plugins/ 2>/dev/null || true
           done
           # Keep jslib
-          cp Packages/com.ratatui.unity/Plugins/WebGL/RatatuiPlugin.jslib \
-             dist/Packages/com.ratatui.unity/Plugins/WebGL/ 2>/dev/null || true
+          cp Packages/com.farukcan.ratatui.unity/Plugins/WebGL/RatatuiPlugin.jslib \
+             dist/Packages/com.farukcan.ratatui.unity/Plugins/WebGL/ 2>/dev/null || true
 
           cd dist
           zip -r ../ratatui-unity-${{ github.ref_name }}.zip .
