@@ -54,6 +54,8 @@ pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager) -> Vec<u
         }
     }
 
+    flip_rows_vertical(&mut pixels, total_w, total_h);
+
     pixels
 }
 
@@ -247,6 +249,23 @@ fn box_drawing_segments(ch: char) -> (bool, bool, bool, bool) {
         '┴' | '╩' | '╧' | '╨' => (true,  true,  true,  false),
         '┼' | '╬' | '╪' | '╫' => (true,  true,  true,  true ),
         _                       => (true,  true,  true,  true ),
+    }
+}
+
+// ─── Y-axis flip ─────────────────────────────────────────────────────────────
+
+/// Flips the pixel buffer vertically in-place (top ↔ bottom row swap).
+///
+/// Unity's `Texture2D.LoadRawTextureData` expects rows in bottom-to-top order
+/// (OpenGL convention), while ratatui renders top-to-bottom. This function
+/// reconciles the two coordinate systems without touching any render logic.
+fn flip_rows_vertical(pixels: &mut [u8], width: u32, height: u32) {
+    let stride = width as usize * 4;
+    for row in 0..height as usize / 2 {
+        let opposite = height as usize - 1 - row;
+        let (top, bottom) = pixels.split_at_mut(opposite * stride);
+        top[row * stride..row * stride + stride]
+            .swap_with_slice(&mut bottom[..stride]);
     }
 }
 

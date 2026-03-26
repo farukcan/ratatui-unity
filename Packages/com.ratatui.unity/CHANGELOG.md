@@ -2,6 +2,11 @@
 
 All notable changes to this package will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Pixel buffer is now flipped vertically before upload so Unity's `Texture2D.LoadRawTextureData` (bottom-to-top / OpenGL row order) displays the terminal the right way up.
+
 ## [0.2.0] - 2026-03-25
 
 ### Added
