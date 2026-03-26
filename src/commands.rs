@@ -171,10 +171,15 @@ pub fn render_all_commands(state: &mut TerminalState) {
                                 .lines()
                                 .map(|t| Line::from(t.to_owned()))
                                 .collect();
+                            let highlight = Style::default()
+                                .fg(Color::Black)
+                                .bg(style.fg.unwrap_or(Color::Cyan))
+                                .add_modifier(Modifier::BOLD);
                             frame.render_widget(
                                 Tabs::new(tab_lines)
                                     .select(*selected as usize)
-                                    .style(*style),
+                                    .style(*style)
+                                    .highlight_style(highlight),
                                 area,
                             );
                         }
