@@ -29,11 +29,18 @@ ratatui-unity/
 
 ## UPM Installation
 
+Open **Window → Package Manager → + → Add package from git URL** and paste:
+
+```
+https://github.com/farukcan/ratatui-unity.git#latest
+```
+
+Or add to `Packages/manifest.json`:
+
 ```json
-// Packages/manifest.json in your Unity project
 {
   "dependencies": {
-    "com.farukcan.ratatui.unity": "https://github.com/<user>/ratatui-unity.git?path=Packages/com.farukcan.ratatui.unity"
+    "com.farukcan.ratatui.unity": "https://github.com/farukcan/ratatui-unity.git#latest"
   }
 }
 ```
