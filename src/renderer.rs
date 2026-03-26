@@ -37,19 +37,83 @@ pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager) -> Vec<u
                         draw_block_element(
                             &mut pixels, first_char, cell_px, cell_py, cw, ch, &fg, total_w,
                         );
-                    } else {
+                    } else if is_braille(first_char) {
+                        draw_braille(
+                            &mut pixels, first_char, cell_px, cell_py, cw, ch, &fg, total_w,
+                        );
+                    } else if font.has_glyph(first_char) {
                         let (metrics, bitmap) = font.get_glyph(first_char);
                         draw_glyph(
                             &mut pixels, &bitmap, &metrics, cell_px, cell_py, cw, ch,
                             font.baseline, &fg, total_w,
                         );
                     }
+                    // Characters not in the font are silently skipped (no .notdef box).
                 }
             }
         }
     }
 
     pixels
+}
+
+// ─── Braille renderer ────────────────────────────────────────────────────────
+
+/// Returns true for Unicode Braille Patterns (U+2800–U+28FF).
+fn is_braille(ch: char) -> bool {
+    matches!(ch, '\u{2800}'..='\u{28FF}')
+}
+
+/// Renders a braille character as a 2-column × 4-row dot grid.
+///
+/// Unicode braille bit layout (relative to U+2800):
+/// - bits 0-3: left column, rows 0-3 top→bottom
+/// - bits 4-7: right column, rows 0-3 top→bottom
+fn draw_braille(
+    pixels: &mut [u8],
+    ch: char,
+    cell_px: u32,
+    cell_py: u32,
+    cw: u32,
+    ch_h: u32,
+    fg: &[u8; 4],
+    total_w: u32,
+) {
+    let bits = ch as u32 - 0x2800;
+    if bits == 0 { return; }
+
+    // Dot radius in pixels (at least 1).
+    let dot_r = (cw / 6).max(1);
+
+    // Grid: 2 columns, 4 rows.  We divide the cell into equal segments.
+    let col_step = cw / 2;
+    let row_step = ch_h / 4;
+
+    for bit in 0..8u32 {
+        if bits & (1 << bit) == 0 { continue; }
+
+        let col = bit / 4;       // 0 = left, 1 = right
+        let row = bit % 4;       // 0..3 top→bottom
+
+        // Centre of this dot within the cell
+        let cx = cell_px + col * col_step + col_step / 2;
+        let cy = cell_py + row * row_step + row_step / 2;
+
+        // Paint a small filled square centered on (cx, cy)
+        let x0 = cx.saturating_sub(dot_r);
+        let y0 = cy.saturating_sub(dot_r);
+        let x1 = (cx + dot_r + 1).min(cell_px + cw);
+        let y1 = (cy + dot_r + 1).min(cell_py + ch_h);
+
+        for py in y0..y1 {
+            for px in x0..x1 {
+                let idx = (py * total_w + px) as usize * 4;
+                if let Some(dst) = pixels.get_mut(idx..idx + 4) {
+                    dst.copy_from_slice(fg);
+                }
+            }
+        }
+    }
 }
 
 // ─── Block element renderer ──────────────────────────────────────────────────

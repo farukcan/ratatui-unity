@@ -65,20 +65,20 @@ public class MyTerminal : RatatuiRenderer
 
 ### RatatuiTerminal
 
-| Method | Description |
-|--------|-------------|
-| `BeginFrame()` | Start a new frame |
-| `EndFrame()` | Render and return RGBA32 pixel data |
-| `Split(area, direction, constraints)` | Divide an area into children |
-| `Block(area, title, borders)` | Bordered box |
-| `Paragraph(area, text, alignment, wrap)` | Text block |
-| `List(area, items, selected)` | Newline-separated list |
-| `Gauge(area, ratio, label)` | Progress bar |
-| `Tabs(area, titles, selected)` | Tab bar |
-| `Sparkline(area, data)` | Spark line chart |
-| `Table(area, data)` | Tab/newline-delimited table |
-| `SetStyle(fg, bg, modifiers)` | Style for next widget |
-| `SetCustomFont(ttfBytes)` | Override embedded font |
+| Method                                   | Description                         |
+| ---------------------------------------- | ----------------------------------- |
+| `BeginFrame()`                           | Start a new frame                   |
+| `EndFrame()`                             | Render and return RGBA32 pixel data |
+| `Split(area, direction, constraints)`    | Divide an area into children        |
+| `Block(area, title, borders)`            | Bordered box                        |
+| `Paragraph(area, text, alignment, wrap)` | Text block                          |
+| `List(area, items, selected)`            | Newline-separated list              |
+| `Gauge(area, ratio, label)`              | Progress bar                        |
+| `Tabs(area, titles, selected)`           | Tab bar                             |
+| `Sparkline(area, data)`                  | Spark line chart                    |
+| `Table(area, data)`                      | Tab/newline-delimited table         |
+| `SetStyle(fg, bg, modifiers)`            | Style for next widget               |
+| `SetCustomFont(ttfBytes)`                | Override embedded font              |
 
 ### Constraint factory methods
 
@@ -92,14 +92,14 @@ Constraint.Fill(1)        // proportional fill
 
 ## Platform Support
 
-| Platform | Binary | Unity DllImport |
-|----------|--------|-----------------|
-| Windows  | `ratatui_unity.dll` | `"ratatui_unity"` |
-| macOS    | `libratatui_unity.bundle` | `"ratatui_unity"` |
-| Linux    | `libratatui_unity.so` | `"ratatui_unity"` |
-| iOS      | `ratatui_unity.xcframework` | `"__Internal"` |
-| Android  | `libratatui_unity.so` | `"ratatui_unity"` |
-| WebGL    | `libratatui_unity.a` | `"__Internal"` |
+| Platform | Binary                      | Unity DllImport   |
+| -------- | --------------------------- | ----------------- |
+| Windows  | `ratatui_unity.dll`         | `"ratatui_unity"` |
+| macOS    | `libratatui_unity.bundle`   | `"ratatui_unity"` |
+| Linux    | `libratatui_unity.so`       | `"ratatui_unity"` |
+| iOS      | `ratatui_unity.xcframework` | `"__Internal"`    |
+| Android  | `libratatui_unity.so`       | `"ratatui_unity"` |
+| WebGL    | `libratatui_unity.a`        | `"__Internal"`    |
 
 ## Building the Native Library
 

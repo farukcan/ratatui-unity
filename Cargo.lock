@@ -305,6 +305,7 @@ version = "0.1.0"
 dependencies = [
  "fontdue",
  "ratatui",
+ "time",
 ]
 
 [[package]]

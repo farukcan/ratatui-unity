@@ -14,6 +14,11 @@ namespace RatatuiUnity
         private IntPtr _handle;
         private bool _disposed;
 
+        /// <summary>
+        /// Internal access to the native handle for builder classes in this assembly.
+        /// </summary>
+        internal IntPtr Handle => _handle;
+
         // Scratch arrays reused across Split() calls to avoid per-frame allocations.
         private byte[]   _splitTypes  = new byte[8];
         private ushort[] _splitValues = new ushort[8];
@@ -259,6 +264,131 @@ namespace RatatuiUnity
         {
             ThrowIfDisposed();
             RatatuiNative.ratatui_table(_handle, areaId, data ?? string.Empty);
+        }
+
+        // ── New widgets ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Render a bar chart. <paramref name="data"/> is a newline-separated list of
+        /// "label\tvalue" pairs (e.g. "Jan\t42\nFeb\t37").
+        /// </summary>
+        public void BarChart(uint areaId, string data, ushort barWidth = 3, ushort barGap = 1)
+        {
+            ThrowIfDisposed();
+            RatatuiNative.ratatui_barchart(
+                _handle, areaId, data ?? string.Empty, barWidth, barGap);
+        }
+
+        /// <summary>
+        /// Render a horizontal line gauge. <paramref name="ratio"/> is clamped to [0, 1].
+        /// </summary>
+        public void LineGauge(uint areaId, float ratio, string label = "")
+        {
+            ThrowIfDisposed();
+            RatatuiNative.ratatui_line_gauge(_handle, areaId, ratio, label ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Render a scrollbar widget.
+        /// </summary>
+        public void Scrollbar(
+            uint areaId,
+            int contentLength,
+            int position,
+            int viewportLength = 0,
+            ScrollbarOrientation orientation = ScrollbarOrientation.VerticalRight)
+        {
+            ThrowIfDisposed();
+            RatatuiNative.ratatui_scrollbar(
+                _handle, areaId,
+                (uint)System.Math.Max(0, contentLength),
+                (uint)System.Math.Max(0, position),
+                (uint)System.Math.Max(0, viewportLength),
+                (byte)orientation);
+        }
+
+        /// <summary>
+        /// Render a monthly calendar for the given date.
+        /// </summary>
+        public void Calendar(uint areaId, int year, int month, int day)
+        {
+            ThrowIfDisposed();
+            RatatuiNative.ratatui_calendar(_handle, areaId, year, (byte)month, (byte)day);
+        }
+
+        /// <summary>
+        /// Render a table with per-column width constraints and optional row selection.
+        /// Same data format as <see cref="Table"/>; pass null <paramref name="columnWidths"/>
+        /// for equal-width columns.
+        /// </summary>
+        public void TableEx(
+            uint areaId,
+            string data,
+            Constraint[] columnWidths = null,
+            int selectedRow = -1)
+        {
+            ThrowIfDisposed();
+            if (columnWidths != null && columnWidths.Length > 0)
+            {
+                byte[]   types  = new byte[columnWidths.Length];
+                ushort[] values = new ushort[columnWidths.Length];
+                for (int i = 0; i < columnWidths.Length; i++)
+                {
+                    types[i]  = (byte)columnWidths[i].Type;
+                    values[i] = columnWidths[i].Value;
+                }
+                RatatuiNative.ratatui_table_ex(
+                    _handle, areaId, data ?? string.Empty,
+                    types, values, (uint)columnWidths.Length, selectedRow);
+            }
+            else
+            {
+                RatatuiNative.ratatui_table_ex(
+                    _handle, areaId, data ?? string.Empty,
+                    null, null, 0, selectedRow);
+            }
+        }
+
+        /// <summary>
+        /// Begin a styled paragraph builder. Finalize with <see cref="StyledText.Render"/>.
+        /// </summary>
+        public StyledText BeginStyledParagraph(
+            uint areaId,
+            Alignment alignment = Alignment.Left,
+            bool wrap = false)
+        {
+            ThrowIfDisposed();
+            return new StyledText(this, areaId, alignment, wrap);
+        }
+
+        /// <summary>
+        /// Begin a chart builder. Finalize with <see cref="ChartBuilder.Render"/>.
+        /// </summary>
+        public ChartBuilder BeginChart(uint areaId)
+        {
+            ThrowIfDisposed();
+            return new ChartBuilder(this, areaId);
+        }
+
+        /// <summary>
+        /// Begin a canvas builder. Finalize with <see cref="CanvasBuilder.Render"/>.
+        /// </summary>
+        public CanvasBuilder BeginCanvas(
+            uint areaId,
+            double xMin, double xMax,
+            double yMin, double yMax,
+            Marker marker = Marker.Dot)
+        {
+            ThrowIfDisposed();
+            return new CanvasBuilder(this, areaId, xMin, xMax, yMin, yMax, marker);
+        }
+
+        /// <summary>
+        /// Convenience overload: SetStyle with <see cref="Modifier"/> flags enum.
+        /// </summary>
+        public void SetStyle(Color fg, Color bg, Modifier modifiers)
+        {
+            SetStyle(fg, bg, (byte)modifiers);
         }
 
         // ── Utility ───────────────────────────────────────────────────────────

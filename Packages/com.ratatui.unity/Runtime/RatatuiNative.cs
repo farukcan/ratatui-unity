@@ -129,5 +129,134 @@ namespace RatatuiUnity
         // Use Marshal.PtrToStringAnsi() without calling free.
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ratatui_version();
+
+        // ── New widgets ───────────────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_barchart(
+            IntPtr handle, uint areaId,
+            [MarshalAs(UnmanagedType.LPStr)] string data,
+            ushort barWidth, ushort barGap);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_line_gauge(
+            IntPtr handle, uint areaId,
+            float ratio,
+            [MarshalAs(UnmanagedType.LPStr)] string label);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_scrollbar(
+            IntPtr handle, uint areaId,
+            uint contentLength, uint position, uint viewportLength,
+            byte orientation);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_calendar(
+            IntPtr handle, uint areaId,
+            int year, byte month, byte day);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_table_ex(
+            IntPtr handle, uint areaId,
+            [MarshalAs(UnmanagedType.LPStr)] string data,
+            byte[] colTypes, ushort[] colValues, uint colCount,
+            int selectedRow);
+
+        // ── StyledParagraph builder ───────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_styled_para_begin(
+            IntPtr handle, uint areaId, byte alignment, byte wrap);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_styled_para_span(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPStr)] string text,
+            byte fgR, byte fgG, byte fgB, byte useDefaultFg,
+            byte bgR, byte bgG, byte bgB, byte useDefaultBg,
+            byte modifiers);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_styled_para_newline(IntPtr handle);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_styled_para_end(IntPtr handle);
+
+        // ── Chart builder ─────────────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_chart_begin(IntPtr handle, uint areaId);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_chart_x_axis(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPStr)] string title,
+            double min, double max);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_chart_y_axis(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPStr)] string title,
+            double min, double max);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_chart_dataset(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name,
+            byte marker,
+            byte r, byte g, byte b,
+            double[] data, uint pointCount);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_chart_end(IntPtr handle);
+
+        // ── Canvas builder ────────────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_begin(
+            IntPtr handle, uint areaId,
+            double xMin, double xMax,
+            double yMin, double yMax,
+            byte marker);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_map(IntPtr handle, byte resolution);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_layer(IntPtr handle);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_line(
+            IntPtr handle,
+            double x1, double y1, double x2, double y2,
+            byte r, byte g, byte b);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_circle(
+            IntPtr handle,
+            double x, double y, double radius,
+            byte r, byte g, byte b);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_rectangle(
+            IntPtr handle,
+            double x, double y, double w, double h,
+            byte r, byte g, byte b);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal static extern void ratatui_canvas_text(
+            IntPtr handle,
+            double x, double y,
+            [MarshalAs(UnmanagedType.LPStr)] string text,
+            byte r, byte g, byte b);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_points(
+            IntPtr handle,
+            double[] coords, uint count,
+            byte r, byte g, byte b);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_canvas_end(IntPtr handle);
     }
 }

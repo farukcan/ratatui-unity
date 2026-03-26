@@ -8,8 +8,9 @@ name = "ratatui_unity"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-ratatui = { version = "0.30", default-features = false }
+ratatui = { version = "0.30", default-features = false, features = ["widget-calendar"] }
 fontdue = "0.9"
+time = { version = "0.3", default-features = false }
 
 [profile.release]
 opt-level = "z"

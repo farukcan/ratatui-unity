@@ -55,7 +55,15 @@ impl FontManager {
         }
     }
 
+    /// Returns whether the font actually contains a glyph for this character.
+    /// glyph_index 0 is .notdef (the "missing" placeholder box).
+    pub fn has_glyph(&self, ch: char) -> bool {
+        self.font.lookup_glyph_index(ch) != 0
+    }
+
     /// Returns (metrics, coverage_bitmap) for a character, using the cache.
+    /// Returns an empty bitmap if the character is not present in the font
+    /// so that the caller can skip rendering rather than drawing .notdef (a box).
     pub fn get_glyph(&mut self, ch: char) -> (Metrics, Vec<u8>) {
         if let Some(entry) = self.glyph_cache.get(&ch) {
             return (entry.0, entry.1.clone());
