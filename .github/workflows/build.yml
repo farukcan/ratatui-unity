@@ -186,7 +186,7 @@ jobs:
 
       - name: Build WebGL
         run: |
-          EMCC_CFLAGS="-O3" cargo build --release --target wasm32-unknown-emscripten
+          EMCC_CFLAGS="-O3" cargo rustc --release --target wasm32-unknown-emscripten --crate-type staticlib
           mkdir -p $PLUGINS/WebGL
           cp target/wasm32-unknown-emscripten/release/libratatui_unity.a $PLUGINS/WebGL/
 
@@ -233,45 +233,3 @@ jobs:
           git remote add origin \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           git push --force origin latest
-
-  # ── Release: assemble all artifacts ─────────────────────────────────────────
-  release:
-    name: Publish Release
-    needs: [build-macos-ios, build-windows, build-linux-android, build-webgl]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Assemble plugin zip
-        run: |
-          mkdir -p dist/Packages/com.farukcan.ratatui.unity
-          cp -r Packages/com.farukcan.ratatui.unity/Runtime   dist/Packages/com.farukcan.ratatui.unity/
-          cp -r Packages/com.farukcan.ratatui.unity/Samples~  dist/Packages/com.farukcan.ratatui.unity/
-          cp    Packages/com.farukcan.ratatui.unity/package.json   dist/Packages/com.farukcan.ratatui.unity/
-          cp    Packages/com.farukcan.ratatui.unity/link.xml        dist/Packages/com.farukcan.ratatui.unity/
-
-          # Merge downloaded native binaries
-          mkdir -p dist/Packages/com.farukcan.ratatui.unity/Plugins
-          for dir in artifacts/plugin-*/; do
-            cp -r "$dir"/* dist/Packages/com.farukcan.ratatui.unity/Plugins/ 2>/dev/null || true
-          done
-          # Keep jslib
-          cp Packages/com.farukcan.ratatui.unity/Plugins/WebGL/RatatuiPlugin.jslib \
-             dist/Packages/com.farukcan.ratatui.unity/Plugins/WebGL/ 2>/dev/null || true
-
-          cd dist
-          zip -r ../ratatui-unity-${{ github.ref_name }}.zip .
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ratatui-unity-${{ github.ref_name }}.zip
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
