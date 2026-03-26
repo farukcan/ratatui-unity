@@ -9,7 +9,7 @@ Renders [Ratatui](https://ratatui.rs) TUI widgets as RGBA pixel textures in Unit
 In your Unity project, open **Window → Package Manager → + → Add package from git URL** and paste:
 
 ```
-https://github.com/<user>/ratatui-unity.git?path=Packages/com.farukcan.ratatui.unity
+https://github.com/farukcan/ratatui-unity.git#latest
 ```
 
 Or add to `Packages/manifest.json`:
@@ -17,7 +17,7 @@ Or add to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.farukcan.ratatui.unity": "https://github.com/<user>/ratatui-unity.git?path=Packages/com.farukcan.ratatui.unity"
+    "com.farukcan.ratatui.unity": "https://github.com/farukcan/ratatui-unity.git#latest"
   }
 }
 ```

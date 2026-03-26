@@ -1,11 +1,8 @@
 name: Build Native Plugin
 
 on:
-#  push:
-#    branches: [main]
-#    tags:     ["v*.*.*"]
-#  pull_request:
-#    branches: [main]
+  push:
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -197,6 +194,45 @@ jobs:
         with:
           name: plugin-webgl
           path: ${{ env.PLUGINS }}/WebGL/
+
+  # ── Publish: push latest branch for UPM ─────────────────────────────────────
+  publish-latest:
+    name: Publish latest branch
+    needs: [build-macos-ios, build-windows, build-linux-android, build-webgl]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Merge native plugins into package
+        run: |
+          cp -r artifacts/plugin-macos-ios/. "$PLUGINS/"
+
+          mkdir -p "$PLUGINS/Windows"
+          cp -r artifacts/plugin-windows/. "$PLUGINS/Windows/"
+
+          cp -r artifacts/plugin-linux-android/. "$PLUGINS/"
+
+          mkdir -p "$PLUGINS/WebGL"
+          cp -r artifacts/plugin-webgl/. "$PLUGINS/WebGL/"
+
+      - name: Force push latest branch
+        run: |
+          cd "Packages/com.farukcan.ratatui.unity"
+          git init -b latest
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit -m "Build from ${GITHUB_SHA::8}"
+          git remote add origin \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git push --force origin latest
 
   # ── Release: assemble all artifacts ─────────────────────────────────────────
   release:
