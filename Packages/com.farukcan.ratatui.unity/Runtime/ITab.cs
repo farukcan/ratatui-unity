@@ -5,8 +5,8 @@ namespace RatatuiUnity
     /// <summary>
     /// Contract for a self-contained demo tab. The host <see cref="RatatuiRenderer"/>
     /// calls <see cref="Update"/> every frame, then <see cref="Render"/> inside
-    /// <c>BuildFrame</c>, and forwards user input via <see cref="OnKeyEvent"/>
-    /// and <see cref="OnMouseEvent"/>.
+    /// <c>BuildFrame</c>, and forwards user input via <see cref="OnKeyEvent"/>,
+    /// <see cref="OnMouseEvent"/>, and <see cref="OnHoverChanged"/>.
     /// </summary>
     public interface ITab
     {
@@ -21,6 +21,9 @@ namespace RatatuiUnity
 
         /// <summary>Forward a mouse event to the tab.</summary>
         void OnMouseEvent(TerminalMouseEvent e);
+
+        /// <summary>Called when the hover state changes (cell or area changed).</summary>
+        void OnHoverChanged(TerminalHoverState oldState, TerminalHoverState newState);
 
         /// <summary>Render all widgets for this tab into <paramref name="area"/>.</summary>
         void Render(RatatuiTerminal term, uint area);

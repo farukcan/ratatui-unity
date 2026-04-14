@@ -46,6 +46,11 @@ namespace RatatuiUnity.Demo
         };
         private readonly StatefulList<string> _tasks = new StatefulList<string>(TaskItems);
 
+        // Mouse hit-testing
+        private uint _taskListArea;
+        private int  _taskListTop;
+        private int  _hoveredTask = -1;
+
         // ── Log list ──────────────────────────────────────────────────────────
         private static readonly (string Evt, string Level)[] AllLogs =
         {
@@ -115,7 +120,29 @@ namespace RatatuiUnity.Demo
             if (e.Key == KeyCode.DownArrow || e.Character == 's' || e.Character == 'S') _tasks.Next();
         }
 
-        public void OnMouseEvent(TerminalMouseEvent e) { }
+        public void OnMouseEvent(TerminalMouseEvent e)
+        {
+            if (e.AreaId == _taskListArea)
+            {
+                if (e.Type == MouseEventType.Click && e.Button == MouseButton.Left)
+                {
+                    int localRow = e.Row - _taskListTop;
+                    _tasks.Select(localRow);
+                }
+                if (e.Type == MouseEventType.Scroll)
+                {
+                    if (e.ScrollDelta > 0) _tasks.Previous();
+                    else _tasks.Next();
+                }
+            }
+        }
+
+        public void OnHoverChanged(TerminalHoverState oldState, TerminalHoverState newState)
+        {
+            _hoveredTask = (newState.IsInside && newState.AreaId == _taskListArea)
+                ? newState.Row - _taskListTop
+                : -1;
+        }
 
         public void Render(RatatuiTerminal term, uint area)
         {
@@ -184,9 +211,12 @@ namespace RatatuiUnity.Demo
 
             if (topCols.Length >= 2)
             {
-                // Task list with selection
-                term.SetStyle(Color.cyan, Color.clear);
-                term.List(topCols[0], _tasks.ToItemsString(t => t), _tasks.Selected);
+                // Task list with selection + hover + mouse hit-testing
+                _taskListArea = topCols[0];
+                if (term.TryGetAreaRect(topCols[0], out int tx, out int ty, out int tw, out int th))
+                    _taskListTop = ty;
+
+                RenderHoverList(term, topCols[0], TaskItems, _tasks.Selected, _hoveredTask);
 
                 // Log list (colored via StyledParagraph)
                 term.Block(topCols[1], "Logs", Borders.All);
@@ -242,16 +272,39 @@ namespace RatatuiUnity.Demo
                 .Render();
         }
 
+        private static void RenderHoverList(
+            RatatuiTerminal term, uint area, string[] items, int selected, int hovered)
+        {
+            var b = term.BeginStyledParagraph(area, Alignment.Left, false);
+            for (int i = 0; i < items.Length; i++)
+            {
+                bool isSelected = i == selected;
+                bool isHovered  = i == hovered && !isSelected;
+                Color fg = isSelected ? Color.black
+                         : isHovered  ? Color.white
+                         : Color.clear;
+                Color bg = isSelected ? Color.cyan
+                         : isHovered  ? new Color(0.15f, 0.15f, 0.3f)
+                         : Color.clear;
+                b.SpanLine(items[i], fg, bg);
+            }
+            b.Render();
+        }
+
         private void RenderFooter(RatatuiTerminal term, uint area)
         {
             term.BeginStyledParagraph(area, Alignment.Left, true)
-                .Span("This demo combines both ratatui demos in one Unity project. ")
                 .Span("Tip: ", fg: Color.yellow, modifiers: Modifier.Bold)
-                .Span("use ")
                 .Span("A/D", fg: Color.cyan, modifiers: Modifier.Bold)
-                .Span(" to switch tabs, ")
-                .Span("W/S or arrows", fg: Color.cyan, modifiers: Modifier.Bold)
-                .Span(" to navigate lists.")
+                .Span(" or ")
+                .Span("click tabs", fg: Color.cyan, modifiers: Modifier.Bold)
+                .Span(" to switch, ")
+                .Span("W/S", fg: Color.cyan, modifiers: Modifier.Bold)
+                .Span(" or ")
+                .Span("scroll wheel", fg: Color.cyan, modifiers: Modifier.Bold)
+                .Span(" to navigate lists, ")
+                .Span("click", fg: Color.cyan, modifiers: Modifier.Bold)
+                .Span(" to select items.")
                 .Render();
         }
     }

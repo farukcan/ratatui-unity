@@ -28,6 +28,12 @@ namespace RatatuiUnity.Demo
             Selected = Selected < 0 ? Items.Length - 1 : (Selected + Items.Length - 1) % Items.Length;
         }
 
+        public void Select(int index)
+        {
+            if (index >= 0 && index < Items.Length)
+                Selected = index;
+        }
+
         /// <summary>Build a newline-separated string for the List widget.</summary>
         public string ToItemsString(Func<T, string> selector)
             => string.Join("\n", Items.Select(selector));

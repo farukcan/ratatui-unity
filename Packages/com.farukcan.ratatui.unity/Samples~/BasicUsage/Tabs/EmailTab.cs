@@ -37,6 +37,11 @@ namespace RatatuiUnity.Demo
 
         private readonly StatefulList<Email> _emails = new StatefulList<Email>(Emails);
 
+        // Mouse hit-testing: area ID and top row of the inbox list (from previous frame)
+        private uint _inboxInnerArea;
+        private int  _inboxTop;
+        private int  _hoveredEmail = -1;
+
         public EmailTab() { _emails.SelectFirst(); }
 
         public void Update(float dt) { }
@@ -53,7 +58,29 @@ namespace RatatuiUnity.Demo
             if (e.Key == KeyCode.DownArrow || e.Character == 's' || e.Character == 'S') _emails.Next();
         }
 
-        public void OnMouseEvent(TerminalMouseEvent e) { }
+        public void OnMouseEvent(TerminalMouseEvent e)
+        {
+            if (e.AreaId == _inboxInnerArea)
+            {
+                if (e.Type == MouseEventType.Click && e.Button == MouseButton.Left)
+                {
+                    int localRow = e.Row - _inboxTop;
+                    _emails.Select(localRow);
+                }
+                if (e.Type == MouseEventType.Scroll)
+                {
+                    if (e.ScrollDelta > 0) _emails.Previous();
+                    else _emails.Next();
+                }
+            }
+        }
+
+        public void OnHoverChanged(TerminalHoverState oldState, TerminalHoverState newState)
+        {
+            _hoveredEmail = (newState.IsInside && newState.AreaId == _inboxInnerArea)
+                ? newState.Row - _inboxTop
+                : -1;
+        }
 
         public void Render(RatatuiTerminal term, uint area)
         {
@@ -72,13 +99,34 @@ namespace RatatuiUnity.Demo
             term.Block(area, "Inbox", Borders.All);
             uint inner = term.Inner(area);
 
-            string items = _emails.ToItemsString(e =>
-                $"{(e.Read ? "  " : "● ")}{e.From,-20} {e.Subject}");
-            term.SetStyle(Color.clear, Color.clear);
-            term.List(inner, items, _emails.Selected);
+            // Store area info for mouse hit-testing
+            _inboxInnerArea = inner;
+            if (term.TryGetAreaRect(inner, out int ax, out int ay, out int aw, out int ah))
+                _inboxTop = ay;
+
+            RenderInboxList(term, inner, _emails.Selected, _hoveredEmail);
 
             term.Scrollbar(area, Emails.Length, System.Math.Max(0, _emails.Selected),
                 viewportLength: 5, orientation: ScrollbarOrientation.VerticalRight);
+        }
+
+        private void RenderInboxList(RatatuiTerminal term, uint area, int selected, int hovered)
+        {
+            var b = term.BeginStyledParagraph(area, Alignment.Left, false);
+            for (int i = 0; i < Emails.Length; i++)
+            {
+                bool isSelected = i == selected;
+                bool isHovered  = i == hovered && !isSelected;
+                Color fg = isSelected ? Color.black
+                         : isHovered  ? Color.white
+                         : Color.clear;
+                Color bg = isSelected ? Color.cyan
+                         : isHovered  ? new Color(0.15f, 0.15f, 0.3f)
+                         : Color.clear;
+                string text = $"{(Emails[i].Read ? "  " : "● ")}{Emails[i].From,-20} {Emails[i].Subject}";
+                b.SpanLine(text, fg, bg);
+            }
+            b.Render();
         }
 
         private void RenderBody(RatatuiTerminal term, uint area)

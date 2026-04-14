@@ -32,6 +32,11 @@ namespace RatatuiUnity.Demo
 
         private readonly StatefulList<string> _ingredients = new StatefulList<string>(Ingredients);
 
+        // Mouse hit-testing
+        private uint _ingredientInnerArea;
+        private int  _ingredientTop;
+        private int  _hoveredIngredient = -1;
+
         public void Update(float dt) { }
 
         public void OnInput(KeyCode key)
@@ -46,7 +51,29 @@ namespace RatatuiUnity.Demo
             if (e.Key == KeyCode.DownArrow || e.Character == 's' || e.Character == 'S') _ingredients.Next();
         }
 
-        public void OnMouseEvent(TerminalMouseEvent e) { }
+        public void OnMouseEvent(TerminalMouseEvent e)
+        {
+            if (e.AreaId == _ingredientInnerArea)
+            {
+                if (e.Type == MouseEventType.Click && e.Button == MouseButton.Left)
+                {
+                    int localRow = e.Row - _ingredientTop;
+                    _ingredients.Select(localRow);
+                }
+                if (e.Type == MouseEventType.Scroll)
+                {
+                    if (e.ScrollDelta > 0) _ingredients.Previous();
+                    else _ingredients.Next();
+                }
+            }
+        }
+
+        public void OnHoverChanged(TerminalHoverState oldState, TerminalHoverState newState)
+        {
+            _hoveredIngredient = (newState.IsInside && newState.AreaId == _ingredientInnerArea)
+                ? newState.Row - _ingredientTop
+                : -1;
+        }
 
         public void Render(RatatuiTerminal term, uint area)
         {
@@ -65,13 +92,34 @@ namespace RatatuiUnity.Demo
             term.Block(area, "Ingredients", Borders.All);
             uint inner = term.Inner(area);
 
-            // List with selection
-            term.SetStyle(Color.cyan, Color.clear);
-            term.List(inner, _ingredients.ToItemsString(s => s), _ingredients.Selected);
+            // Store area info for mouse hit-testing
+            _ingredientInnerArea = inner;
+            if (term.TryGetAreaRect(inner, out int ax, out int ay, out int aw, out int ah))
+                _ingredientTop = ay;
+
+            RenderIngredientList(term, inner, _ingredients.Selected, _hoveredIngredient);
 
             // Scrollbar on the right edge
             term.Scrollbar(area, Ingredients.Length, System.Math.Max(0, _ingredients.Selected),
                 viewportLength: 8, orientation: ScrollbarOrientation.VerticalRight);
+        }
+
+        private void RenderIngredientList(RatatuiTerminal term, uint area, int selected, int hovered)
+        {
+            var b = term.BeginStyledParagraph(area, Alignment.Left, false);
+            for (int i = 0; i < Ingredients.Length; i++)
+            {
+                bool isSelected = i == selected;
+                bool isHovered  = i == hovered && !isSelected;
+                Color fg = isSelected ? Color.black
+                         : isHovered  ? Color.white
+                         : Color.clear;
+                Color bg = isSelected ? Color.cyan
+                         : isHovered  ? new Color(0.15f, 0.15f, 0.3f)
+                         : Color.clear;
+                b.SpanLine(Ingredients[i], fg, bg);
+            }
+            b.Render();
         }
 
         private void RenderSteps(RatatuiTerminal term, uint area)

@@ -42,6 +42,9 @@ namespace RatatuiUnity
         [Tooltip("Enable keyboard input.")]
         [SerializeField] private bool _enableKeyboardInput = true;
 
+        [Tooltip("Scroll wheel sensitivity multiplier. Increase for faster scrolling.")]
+        [SerializeField] private float _scrollSensitivity = 1f;
+
         // ── Public Properties ─────────────────────────────────────────────────
 
         /// <summary>The rendered texture. Assign to any Unity material or UI image.</summary>
@@ -259,7 +262,7 @@ namespace RatatuiUnity
             }
 
             // Scroll wheel
-            float scroll = Input.mouseScrollDelta.y;
+            float scroll = Input.mouseScrollDelta.y * _scrollSensitivity;
             if (Mathf.Abs(scroll) > 0.01f)
             {
                 OnTerminalMouseEvent(new TerminalMouseEvent(

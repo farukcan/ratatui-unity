@@ -35,6 +35,7 @@ namespace RatatuiUnity.Demo
         public void OnInput(KeyCode key) { }
         public void OnKeyEvent(TerminalKeyEvent e) { }
         public void OnMouseEvent(TerminalMouseEvent e) { }
+        public void OnHoverChanged(TerminalHoverState oldState, TerminalHoverState newState) { }
 
         public void Render(RatatuiTerminal term, uint area)
         {
