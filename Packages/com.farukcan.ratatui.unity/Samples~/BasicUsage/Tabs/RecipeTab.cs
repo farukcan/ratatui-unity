@@ -40,6 +40,14 @@ namespace RatatuiUnity.Demo
             if (key == KeyCode.DownArrow || key == KeyCode.S) _ingredients.Next();
         }
 
+        public void OnKeyEvent(TerminalKeyEvent e)
+        {
+            if (e.Key == KeyCode.UpArrow   || e.Character == 'w' || e.Character == 'W') _ingredients.Previous();
+            if (e.Key == KeyCode.DownArrow || e.Character == 's' || e.Character == 'S') _ingredients.Next();
+        }
+
+        public void OnMouseEvent(TerminalMouseEvent e) { }
+
         public void Render(RatatuiTerminal term, uint area)
         {
             var cols = term.Split(area, Direction.Horizontal,

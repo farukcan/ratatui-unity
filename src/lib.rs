@@ -704,6 +704,57 @@ pub extern "C" fn ratatui_canvas_end(handle: *mut c_void) {
     }
 }
 
+// ─── Input / Hit-Testing ─────────────────────────────────────────────────────
+
+/// Returns the most specific area ID at the given terminal cell coordinates.
+/// If multiple areas overlap, the one with the smallest area (most specific) is returned.
+/// Returns 0 (root) if no specific area contains the cell.
+#[no_mangle]
+pub extern "C" fn ratatui_hit_test(
+    handle: *mut c_void,
+    col: u16,
+    row: u16,
+) -> u32 {
+    if handle.is_null() { return 0; }
+    let state = unsafe { state_mut(handle) };
+    let mut best_id = 0u32;
+    let mut best_area = u32::MAX;
+
+    for (&id, &rect) in &state.area_map {
+        if col >= rect.x && col < rect.x + rect.width
+            && row >= rect.y && row < rect.y + rect.height
+        {
+            let area = (rect.width as u32) * (rect.height as u32);
+            if area < best_area {
+                best_area = area;
+                best_id = id;
+            }
+        }
+    }
+    best_id
+}
+
+/// Returns the cell-space rectangle of the given area_id as a packed u64.
+/// Format: x | (y << 16) | (width << 32) | (height << 48)
+/// Returns 0 if the area is not found.
+#[no_mangle]
+pub extern "C" fn ratatui_get_area_rect(
+    handle: *const c_void,
+    area_id: u32,
+) -> u64 {
+    if handle.is_null() { return 0; }
+    let state = unsafe { &*(handle as *const TerminalState) };
+    match state.area_map.get(&area_id) {
+        Some(rect) => {
+            (rect.x as u64)
+                | ((rect.y as u64) << 16)
+                | ((rect.width as u64) << 32)
+                | ((rect.height as u64) << 48)
+        }
+        None => 0,
+    }
+}
+
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
 /// Returns the library version string as a static C string.

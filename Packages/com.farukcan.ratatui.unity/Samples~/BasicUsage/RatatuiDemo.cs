@@ -11,8 +11,6 @@ using RatatuiUnity.Demo;
 /// </summary>
 public class RatatuiDemo : RatatuiRenderer
 {
-    // Terminal size and font size are configured via the RatatuiRenderer Inspector fields.
-
     // ── State ─────────────────────────────────────────────────────────────────
 
     private ITab[] _tabs;
@@ -46,48 +44,61 @@ public class RatatuiDemo : RatatuiRenderer
 
         _tabs = new ITab[]
         {
-            _dashboard, _servers, _colors,          // Demo1
-            _about, _recipe, _email, _traceroute, _weather, // Demo2
+            _dashboard, _servers, _colors,
+            _about, _recipe, _email, _traceroute, _weather,
         };
     }
 
     protected override void Update()
     {
-        HandleInput();
-
         float dt = Time.deltaTime;
         foreach (var tab in _tabs)
             tab.Update(dt);
 
+        // base.Update() calls ProcessInput() then BuildFrame()
         base.Update();
     }
 
-    private void HandleInput()
-    {
-        // Tab switching
-        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
-            _activeTab = (_activeTab + 1) % _tabs.Length;
-        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
-            _activeTab = (_activeTab + _tabs.Length - 1) % _tabs.Length;
+    // ── Keyboard Handler ──────────────────────────────────────────────────────
 
-        // Forward navigation keys to active tab
-        foreach (KeyCode key in new[] {
-            KeyCode.UpArrow, KeyCode.DownArrow,
-            KeyCode.W, KeyCode.S,
-            KeyCode.Return, KeyCode.Space })
-        {
-            if (Input.GetKeyDown(key))
-                _tabs[_activeTab].OnInput(key);
-        }
+    protected override void OnTerminalKeyDown(TerminalKeyEvent e)
+    {
+        // Arrow keys come via GetKeyDown (Key set, Character='\0')
+        // Letter keys come via inputString (Key=KeyCode.None, Character set)
+        bool nextTab = e.Key == KeyCode.RightArrow
+                    || e.Character == 'd' || e.Character == 'D';
+        bool prevTab = e.Key == KeyCode.LeftArrow
+                    || e.Character == 'a' || e.Character == 'A';
+
+        if (nextTab) { _activeTab = (_activeTab + 1) % _tabs.Length; return; }
+        if (prevTab) { _activeTab = (_activeTab + _tabs.Length - 1) % _tabs.Length; return; }
+
+        _tabs[_activeTab].OnKeyEvent(e);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Mouse Handler ─────────────────────────────────────────────────────────
+
+    protected override void OnTerminalMouseEvent(TerminalMouseEvent e)
+    {
+        _tabs[_activeTab].OnMouseEvent(e);
+    }
+
+    // ── Hover Handler (optional) ──────────────────────────────────────────────
+
+    protected override void OnTerminalHoverChanged(
+        TerminalHoverState oldState, TerminalHoverState newState)
+    {
+        // Uncomment for debug:
+        // if (newState.IsInside)
+        //     Debug.Log($"Hover: cell=({newState.Col},{newState.Row}) area={newState.AreaId}");
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
 
     protected override void BuildFrame(RatatuiTerminal term)
     {
         uint root = term.RootArea;
 
-        // Main layout: tab bar at top, content below
         var main = term.Split(root, Direction.Vertical,
             Constraint.Length(3),
             Constraint.Min(0));
@@ -100,7 +111,6 @@ public class RatatuiDemo : RatatuiRenderer
 
     private void RenderTabBar(RatatuiTerminal term, uint area)
     {
-        // Build newline-separated tab title string
         var sb = new System.Text.StringBuilder();
         for (int i = 0; i < _tabs.Length; i++)
         {

@@ -258,5 +258,21 @@ namespace RatatuiUnity
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_canvas_end(IntPtr handle);
+
+        // ── Input / Hit-Testing ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the most specific area ID at the given terminal cell.
+        /// Returns 0 (root) if no specific area contains the cell.
+        /// </summary>
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern uint ratatui_hit_test(IntPtr handle, ushort col, ushort row);
+
+        /// <summary>
+        /// Returns area rect as packed u64: x | (y &lt;&lt; 16) | (w &lt;&lt; 32) | (h &lt;&lt; 48).
+        /// Returns 0 if area not found.
+        /// </summary>
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong ratatui_get_area_rect(IntPtr handle, uint areaId);
     }
 }

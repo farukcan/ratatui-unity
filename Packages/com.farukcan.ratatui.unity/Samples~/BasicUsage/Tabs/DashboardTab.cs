@@ -109,6 +109,14 @@ namespace RatatuiUnity.Demo
             if (key == KeyCode.DownArrow || key == KeyCode.S)  _tasks.Next();
         }
 
+        public void OnKeyEvent(TerminalKeyEvent e)
+        {
+            if (e.Key == KeyCode.UpArrow   || e.Character == 'w' || e.Character == 'W') _tasks.Previous();
+            if (e.Key == KeyCode.DownArrow || e.Character == 's' || e.Character == 'S') _tasks.Next();
+        }
+
+        public void OnMouseEvent(TerminalMouseEvent e) { }
+
         public void Render(RatatuiTerminal term, uint area)
         {
             var rows = term.Split(area, Direction.Vertical,

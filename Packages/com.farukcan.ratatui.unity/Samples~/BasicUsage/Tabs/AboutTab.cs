@@ -12,6 +12,8 @@ namespace RatatuiUnity.Demo
 
         public void Update(float dt) { }
         public void OnInput(KeyCode key) { }
+        public void OnKeyEvent(TerminalKeyEvent e) { }
+        public void OnMouseEvent(TerminalMouseEvent e) { }
 
         public void Render(RatatuiTerminal term, uint area)
         {

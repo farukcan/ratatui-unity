@@ -391,6 +391,40 @@ namespace RatatuiUnity
             SetStyle(fg, bg, (byte)modifiers);
         }
 
+        // ── Input / Hit-Testing ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the most specific area ID at the given terminal cell coordinates.
+        /// Uses the area_map from the previous frame's layout.
+        /// Returns 0 (root area) if no specific widget area contains the cell.
+        /// </summary>
+        public uint HitTest(int col, int row)
+        {
+            ThrowIfDisposed();
+            return RatatuiNative.ratatui_hit_test(_handle, (ushort)col, (ushort)row);
+        }
+
+        /// <summary>
+        /// Returns the cell-space rectangle of the given area ID.
+        /// Useful for positioning tooltips, calculating scroll bounds, etc.
+        /// Returns false if the area ID is not found.
+        /// </summary>
+        public bool TryGetAreaRect(uint areaId, out int x, out int y, out int width, out int height)
+        {
+            ThrowIfDisposed();
+            ulong packed = RatatuiNative.ratatui_get_area_rect(_handle, areaId);
+            if (packed == 0 && areaId != 0)
+            {
+                x = y = width = height = 0;
+                return false;
+            }
+            x      = (int)(packed & 0xFFFF);
+            y      = (int)((packed >> 16) & 0xFFFF);
+            width  = (int)((packed >> 32) & 0xFFFF);
+            height = (int)((packed >> 48) & 0xFFFF);
+            return true;
+        }
+
         // ── Utility ───────────────────────────────────────────────────────────
 
         /// <summary>Returns the native library version string.</summary>
