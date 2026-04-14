@@ -63,6 +63,10 @@ namespace RatatuiUnity
         private int _mouseDownRow = -1;
         private MouseButton _mouseDownButton;
 
+        // Accumulates raw scroll delta; fires a discrete event per threshold crossed.
+        // This normalizes continuous (trackpad) and discrete (mouse wheel) input.
+        private float _scrollAccumulator;
+
         // Non-character keys polled with GetKeyDown each frame
         private static readonly KeyCode[] TrackedKeys =
         {
@@ -261,13 +265,21 @@ namespace RatatuiUnity
                 }
             }
 
-            // Scroll wheel
-            float scroll = Input.mouseScrollDelta.y * _scrollSensitivity;
-            if (Mathf.Abs(scroll) > 0.01f)
+            // Scroll wheel — accumulate raw delta, fire one discrete event per threshold.
+            // This converts smooth/continuous trackpad input into predictable discrete steps.
+            float rawScroll = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(rawScroll) > 0.001f)
             {
-                OnTerminalMouseEvent(new TerminalMouseEvent(
-                    MouseEventType.Scroll, col, row, areaId,
-                    MouseButton.Left, scroll, mods));
+                _scrollAccumulator += rawScroll;
+                float threshold = 1f / Mathf.Max(0.01f, _scrollSensitivity);
+                while (Mathf.Abs(_scrollAccumulator) >= threshold)
+                {
+                    float dir = Mathf.Sign(_scrollAccumulator);
+                    _scrollAccumulator -= dir * threshold;
+                    OnTerminalMouseEvent(new TerminalMouseEvent(
+                        MouseEventType.Scroll, col, row, areaId,
+                        MouseButton.Left, dir, mods));
+                }
             }
         }
 
