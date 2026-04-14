@@ -67,6 +67,12 @@ namespace RatatuiUnity
         // This normalizes continuous (trackpad) and discrete (mouse wheel) input.
         private float _scrollAccumulator;
 
+        // Key repeat state for held-down special keys
+        private KeyCode _heldKey = KeyCode.None;
+        private float _heldKeyTime;
+        private const float KeyRepeatDelay = 0.4f;  // seconds before repeat starts
+        private const float KeyRepeatRate  = 0.035f; // seconds between repeats
+
         // Non-character keys polled with GetKeyDown each frame
         private static readonly KeyCode[] TrackedKeys =
         {
@@ -173,18 +179,39 @@ namespace RatatuiUnity
         {
             var mods = GetCurrentModifiers();
 
-            // Character input — skip control chars, those are handled as KeyCode below
+            // Character input — skip control chars and macOS function key codes
             foreach (char c in Input.inputString)
             {
                 if (char.IsControl(c)) continue;
+                // macOS injects Private Use Area chars (U+E000–U+F8FF) for function/arrow keys
+                if (c >= '\uE000' && c <= '\uF8FF') continue;
                 OnTerminalKeyDown(new TerminalKeyEvent(KeyCode.None, c, mods));
             }
 
-            // Special non-character keys
+            // Special non-character keys — with key repeat for held keys
+            float dt = Time.unscaledDeltaTime;
+
+            // Check if held key was released
+            if (_heldKey != KeyCode.None && !Input.GetKey(_heldKey))
+                _heldKey = KeyCode.None;
+
             foreach (var key in TrackedKeys)
             {
                 if (Input.GetKeyDown(key))
+                {
                     OnTerminalKeyDown(new TerminalKeyEvent(key, '\0', mods));
+                    _heldKey = key;
+                    _heldKeyTime = 0f;
+                }
+                else if (key == _heldKey && Input.GetKey(key))
+                {
+                    _heldKeyTime += dt;
+                    if (_heldKeyTime >= KeyRepeatDelay)
+                    {
+                        _heldKeyTime -= KeyRepeatRate;
+                        OnTerminalKeyDown(new TerminalKeyEvent(key, '\0', mods));
+                    }
+                }
             }
         }
 

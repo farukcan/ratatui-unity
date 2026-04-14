@@ -14,21 +14,22 @@ public class RatatuiDemo : RatatuiRenderer
     // ── State ─────────────────────────────────────────────────────────────────
 
     private ITab[] _tabs;
-    private int    _activeTab;
+    private int _activeTab;
 
     // ── Tab bar hit-testing ─────────────────────────────────────────────────
     private uint _tabBarArea;
 
     // ── ITab instances ────────────────────────────────────────────────────────
 
-    private DashboardTab  _dashboard;
-    private ServersTab    _servers;
-    private ColorsTab     _colors;
-    private AboutTab      _about;
-    private RecipeTab     _recipe;
-    private EmailTab      _email;
+    private DashboardTab _dashboard;
+    private ServersTab _servers;
+    private ColorsTab _colors;
+    private AboutTab _about;
+    private RecipeTab _recipe;
+    private EmailTab _email;
     private TracerouteTab _traceroute;
-    private WeatherTab    _weather;
+    private WeatherTab _weather;
+    private InputTab _inputTab;
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -36,19 +37,20 @@ public class RatatuiDemo : RatatuiRenderer
     {
         base.Awake();
 
-        _dashboard  = new DashboardTab();
-        _servers    = new ServersTab();
-        _colors     = new ColorsTab();
-        _about      = new AboutTab();
-        _recipe     = new RecipeTab();
-        _email      = new EmailTab();
+        _dashboard = new DashboardTab();
+        _servers = new ServersTab();
+        _colors = new ColorsTab();
+        _about = new AboutTab();
+        _recipe = new RecipeTab();
+        _email = new EmailTab();
         _traceroute = new TracerouteTab();
-        _weather    = new WeatherTab();
+        _weather = new WeatherTab();
+        _inputTab = new InputTab();
 
         _tabs = new ITab[]
         {
             _dashboard, _servers, _colors,
-            _about, _recipe, _email, _traceroute, _weather,
+            _about, _recipe, _email, _traceroute, _weather, _inputTab,
         };
     }
 
@@ -66,15 +68,14 @@ public class RatatuiDemo : RatatuiRenderer
 
     protected override void OnTerminalKeyDown(TerminalKeyEvent e)
     {
-        // Arrow keys come via GetKeyDown (Key set, Character='\0')
-        // Letter keys come via inputString (Key=KeyCode.None, Character set)
+        // A/D for tab switching (forwarded to active tab when InputTab is active)
         bool nextTab = e.Key == KeyCode.RightArrow
                     || e.Character == 'd' || e.Character == 'D';
         bool prevTab = e.Key == KeyCode.LeftArrow
                     || e.Character == 'a' || e.Character == 'A';
-
-        if (nextTab) { _activeTab = (_activeTab + 1) % _tabs.Length; return; }
-        if (prevTab) { _activeTab = (_activeTab + _tabs.Length - 1) % _tabs.Length; return; }
+        bool inputTabActive = _tabs[_activeTab] == _inputTab;
+        if (nextTab && !inputTabActive) { _activeTab = (_activeTab + 1) % _tabs.Length; return; }
+        if (prevTab && !inputTabActive) { _activeTab = (_activeTab + _tabs.Length - 1) % _tabs.Length; return; }
 
         _tabs[_activeTab].OnKeyEvent(e);
     }
