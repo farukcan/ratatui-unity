@@ -104,6 +104,7 @@ namespace RatatuiUnity
                 wrapMode   = TextureWrapMode.Clamp,
             };
             ApplyTextureTarget();
+            ValidateInputRequirements();
         }
 
         protected virtual void Update()
@@ -354,7 +355,7 @@ namespace RatatuiUnity
 
                 Ray ray = cam.ScreenPointToRay(screenPos);
                 if (!Physics.Raycast(ray, out RaycastHit hit)) return false;
-                if (hit.collider == null || hit.collider.gameObject != gameObject)
+                if (hit.collider == null || hit.collider.gameObject != _meshRenderer.gameObject)
                     return false;
 
                 col = Mathf.Clamp(
@@ -367,6 +368,43 @@ namespace RatatuiUnity
             }
 
             return false;
+        }
+
+        // ── Validation ────────────────────────────────────────────────────────
+
+        private void ValidateInputRequirements()
+        {
+            if (!_enableInput || !_enableMouseInput) return;
+            if (_meshRenderer == null) return;
+
+            var meshGo = _meshRenderer.gameObject;
+
+            if (meshGo.GetComponent<Collider>() == null)
+            {
+                Debug.LogWarning(
+                    $"[RatatuiRenderer] Mouse input is enabled but '{meshGo.name}' " +
+                    "has no Collider. Add a MeshCollider (non-convex) for mouse hit-testing.",
+                    this);
+            }
+            else
+            {
+                var mc = meshGo.GetComponent<MeshCollider>();
+                if (mc != null && mc.convex)
+                {
+                    Debug.LogWarning(
+                        $"[RatatuiRenderer] MeshCollider on '{meshGo.name}' is convex. " +
+                        "UV-based hit coordinates (textureCoord) require a non-convex MeshCollider.",
+                        this);
+                }
+            }
+
+            if (Camera.main == null)
+            {
+                Debug.LogWarning(
+                    "[RatatuiRenderer] Camera.main is null. Ensure a camera is tagged 'MainCamera' " +
+                    "for MeshRenderer mouse input to work.",
+                    this);
+            }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
