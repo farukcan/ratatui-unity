@@ -183,4 +183,14 @@ mergeInto(LibraryManager.library, {
     _ratatui_canvas_end(handle);
   },
 
+  // ── Hit testing ────────────────────────────────────────────────────────────
+
+  ratatui_hit_test: function(handle, col, row) {
+    return _ratatui_hit_test(handle, col, row);
+  },
+
+  ratatui_get_area_rect: function(handle, areaId) {
+    return _ratatui_get_area_rect(handle, areaId);
+  },
+
 });
