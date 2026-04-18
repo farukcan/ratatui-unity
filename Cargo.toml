@@ -18,9 +18,3 @@ time = { version = "0.3", default-features = false }
 opt-level = "z"
 lto = true
 panic = "abort"
-
-[target.wasm32-unknown-emscripten]
-rustflags = [
-    "-C",
-    "target-feature=-bulk-memory,-bulk-memory-opt,-call-indirect-overlong",
-]
