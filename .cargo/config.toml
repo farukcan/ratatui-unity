@@ -1,5 +1,5 @@
 [target.wasm32-unknown-emscripten]
-rustflags = [
-    "-C",
-    "target-feature=-bulk-memory,-bulk-memory-opt,-call-indirect-overlong",
-]
+# Defense-in-depth: explicitly disable `bulk-memory` so a future Rust
+# toolchain bump cannot silently re-enable it and break Unity WebGL linking.
+# See rust-toolchain.toml for why this matters.
+rustflags = ["-C", "target-feature=-bulk-memory"]
