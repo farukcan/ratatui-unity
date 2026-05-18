@@ -1,5 +1,23 @@
 # ratatui-unity
 
+[![Build Native Plugin](https://github.com/farukcan/ratatui-unity/actions/workflows/build.yml/badge.svg)](https://github.com/farukcan/ratatui-unity/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](Packages/com.farukcan.ratatui.unity/LICENSE)
+[![Rust Edition 2021](https://img.shields.io/badge/Rust-2021_Edition-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![ratatui 0.30](https://img.shields.io/badge/ratatui-0.30-blue?logo=rust)](https://ratatui.rs)
+[![Unity](https://img.shields.io/badge/Unity-2021%2B-black?logo=unity&logoColor=white)](https://unity.com)
+[![UPM](https://img.shields.io/badge/UPM-git--url-blue?logo=unity&logoColor=white)](https://github.com/farukcan/ratatui-unity.git#latest)
+[![GitHub stars](https://img.shields.io/github/stars/farukcan/ratatui-unity?style=social)](https://github.com/farukcan/ratatui-unity/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/farukcan/ratatui-unity?style=social)](https://github.com/farukcan/ratatui-unity/network/members)
+[![GitHub last commit](https://img.shields.io/github/last-commit/farukcan/ratatui-unity)](https://github.com/farukcan/ratatui-unity/commits/main)
+[![GitHub issues](https://img.shields.io/github/issues/farukcan/ratatui-unity)](https://github.com/farukcan/ratatui-unity/issues)
+
+![Platform macOS](https://img.shields.io/badge/platform-macOS-lightgrey?logo=apple&logoColor=white)
+![Platform iOS](https://img.shields.io/badge/platform-iOS-lightgrey?logo=apple&logoColor=white)
+![Platform Windows](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)
+![Platform Linux](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)
+![Platform Android](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
+![Platform WebGL](https://img.shields.io/badge/platform-WebGL-990000?logo=webgl&logoColor=white)
+
 A Rust native plugin that renders [Ratatui](https://ratatui.rs) TUI widgets as RGBA pixel textures in Unity — for all platforms.
 
 ## Repository Layout
