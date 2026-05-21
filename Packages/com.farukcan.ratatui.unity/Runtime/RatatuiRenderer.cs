@@ -8,6 +8,7 @@ namespace RatatuiUnity
     /// MonoBehaviour that renders a Ratatui terminal to a <see cref="Texture2D"/>
     /// and optionally assigns it to a UI <see cref="RawImage"/> or a
     /// <see cref="MeshRenderer"/> material each frame.
+    /// When no target is assigned, falls back to OnGUI rendering (centered on screen).
     ///
     /// Override <see cref="BuildFrame"/> to define widget layout.
     /// Override <see cref="OnTerminalKeyDown"/>, <see cref="OnTerminalMouseEvent"/>,
@@ -61,6 +62,9 @@ namespace RatatuiUnity
 
         // ── Internal State ────────────────────────────────────────────────────
 
+        // OnGUI fallback rect (GUI coordinates: y=0 at top)
+        private Rect _onGuiRect;
+
         // Track where mouse-down happened for click detection
         private int _mouseDownCol = -1;
         private int _mouseDownRow = -1;
@@ -74,7 +78,7 @@ namespace RatatuiUnity
         private KeyCode _heldKey = KeyCode.None;
         private float _heldKeyTime;
         private const float KeyRepeatDelay = 0.4f;  // seconds before repeat starts
-        private const float KeyRepeatRate  = 0.035f; // seconds between repeats
+        private const float KeyRepeatRate = 0.035f; // seconds between repeats
 
         // Non-character keys polled with GetKeyDown each frame
         private static readonly KeyCode[] TrackedKeys =
@@ -100,14 +104,14 @@ namespace RatatuiUnity
                 CalculateColsRowsFromRectTransform();
 
             Terminal = new RatatuiTerminal(_cols, _rows, _fontSize);
-            Texture  = new Texture2D(
+            Texture = new Texture2D(
                 Terminal.PixelWidth,
                 Terminal.PixelHeight,
                 TextureFormat.RGBA32,
                 mipChain: false)
             {
                 filterMode = FilterMode.Point,
-                wrapMode   = TextureWrapMode.Clamp,
+                wrapMode = TextureWrapMode.Clamp,
             };
             ApplyTextureTarget();
             ValidateInputRequirements();
@@ -115,6 +119,10 @@ namespace RatatuiUnity
 
         protected virtual void Update()
         {
+            // Update OnGUI rect before input so mouse coordinates are correct
+            if (_rawImage == null && _meshRenderer == null)
+                UpdateOnGuiRect();
+
             // Input runs before BuildFrame so state changes are reflected in the same frame
             if (_enableInput) ProcessInput();
 
@@ -128,6 +136,14 @@ namespace RatatuiUnity
                 Texture.LoadRawTextureData(ptr, byteCount);
                 Texture.Apply(updateMipmaps: false);
             }
+        }
+
+        protected virtual void OnGUI()
+        {
+            if (_rawImage != null || _meshRenderer != null) return;
+            if (Texture == null) return;
+
+            GUI.DrawTexture(_onGuiRect, Texture, ScaleMode.StretchToFill, false);
         }
 
         protected virtual void OnDestroy()
@@ -160,24 +176,25 @@ namespace RatatuiUnity
         /// Called when the hover state changes (mouse enters/exits areas or the terminal).
         /// </summary>
         protected virtual void OnTerminalHoverChanged(
-            TerminalHoverState oldState, TerminalHoverState newState) { }
+            TerminalHoverState oldState, TerminalHoverState newState)
+        { }
 
         // ── Input Processing ──────────────────────────────────────────────────
 
         private void ProcessInput()
         {
             if (_enableKeyboardInput) ProcessKeyboard();
-            if (_enableMouseInput)    ProcessMouse();
+            if (_enableMouseInput) ProcessMouse();
         }
 
         private KeyModifiers GetCurrentModifiers()
         {
             var mods = KeyModifiers.None;
-            if (Input.GetKey(KeyCode.LeftShift)   || Input.GetKey(KeyCode.RightShift))
+            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                 mods |= KeyModifiers.Shift;
             if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
                 mods |= KeyModifiers.Ctrl;
-            if (Input.GetKey(KeyCode.LeftAlt)     || Input.GetKey(KeyCode.RightAlt))
+            if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt))
                 mods |= KeyModifiers.Alt;
             return mods;
         }
@@ -244,8 +261,8 @@ namespace RatatuiUnity
 
             // Update hover state
             var currentHover = new TerminalHoverState(col, row, areaId, true);
-            bool hoverChanged = currentHover.Col    != HoverState.Col
-                             || currentHover.Row    != HoverState.Row
+            bool hoverChanged = currentHover.Col != HoverState.Col
+                             || currentHover.Row != HoverState.Row
                              || currentHover.AreaId != HoverState.AreaId
                              || currentHover.IsInside != HoverState.IsInside;
 
@@ -270,8 +287,8 @@ namespace RatatuiUnity
 
                 if (Input.GetMouseButtonDown(btn))
                 {
-                    _mouseDownCol    = col;
-                    _mouseDownRow    = row;
+                    _mouseDownCol = col;
+                    _mouseDownRow = row;
                     _mouseDownButton = mouseBtn;
 
                     OnTerminalMouseEvent(new TerminalMouseEvent(
@@ -321,7 +338,7 @@ namespace RatatuiUnity
 
         /// <summary>
         /// Converts a screen-space pixel position to terminal cell coordinates.
-        /// Supports both RawImage (UI) and MeshRenderer (3D) targets.
+        /// Supports RawImage (UI), MeshRenderer (3D), and OnGUI fallback targets.
         /// </summary>
         protected bool TryGetTerminalCell(Vector2 screenPos, out int col, out int row)
         {
@@ -373,6 +390,23 @@ namespace RatatuiUnity
                 return true;
             }
 
+            // OnGUI fallback: convert Input.mousePosition (y=0 bottom) to GUI space (y=0 top)
+            if (_onGuiRect.width > 0f)
+            {
+                float guiMouseY = Screen.height - screenPos.y;
+                float normalizedX = (screenPos.x - _onGuiRect.x) / _onGuiRect.width;
+                float normalizedY = (guiMouseY - _onGuiRect.y) / _onGuiRect.height;
+
+                if (normalizedX < 0f || normalizedX > 1f ||
+                    normalizedY < 0f || normalizedY > 1f)
+                    return false;
+
+                col = Mathf.Clamp((int)(normalizedX * Terminal.Cols), 0, Terminal.Cols - 1);
+                // No Y-flip: both GUI and terminal have y=0 at top
+                row = Mathf.Clamp((int)(normalizedY * Terminal.Rows), 0, Terminal.Rows - 1);
+                return true;
+            }
+
             return false;
         }
 
@@ -411,6 +445,16 @@ namespace RatatuiUnity
                     "for MeshRenderer mouse input to work.",
                     this);
             }
+        }
+
+        // ── OnGUI Helpers ─────────────────────────────────────────────────
+
+        private void UpdateOnGuiRect()
+        {
+            if (Texture == null) return;
+            float x = (Screen.width - Texture.width) * 0.5f;
+            float y = (Screen.height - Texture.height) * 0.5f;
+            _onGuiRect = new Rect(x, y, Texture.width, Texture.height);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
