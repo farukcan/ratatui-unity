@@ -4,17 +4,20 @@ use fontdue::Metrics;
 use ratatui::buffer::Buffer;
 
 /// Converts a ratatui `Buffer` (cell grid) into a flat RGBA pixel buffer.
-/// The returned Vec is `pixel_width * pixel_height * 4` bytes.
-pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager) -> Vec<u8> {
+/// Reuses the provided `pixels` Vec to avoid per-frame allocation.
+pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager, pixels: &mut Vec<u8>) {
     let area = buffer.area();
     let cols = area.width as u32;
     let rows = area.height as u32;
     let cw = font.cell_width;
     let ch = font.cell_height;
+    let baseline = font.baseline;
     let total_w = cols * cw;
     let total_h = rows * ch;
 
-    let mut pixels = vec![0u8; (total_w * total_h * 4) as usize];
+    let required = (total_w * total_h * 4) as usize;
+    pixels.resize(required, 0);
+    pixels.fill(0);
 
     for row in 0..rows {
         for col in 0..cols {
@@ -28,24 +31,24 @@ pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager) -> Vec<u
             let cell_px = col * cw;
             let cell_py = row * ch;
 
-            fill_background(&mut pixels, cell_px, cell_py, cw, ch, &bg, total_w);
+            fill_background(pixels, cell_px, cell_py, cw, ch, &bg, total_w);
 
             let symbol = cell.symbol();
             if let Some(first_char) = symbol.chars().next() {
                 if !first_char.is_whitespace() {
                     if is_block_element(first_char) {
                         draw_block_element(
-                            &mut pixels, first_char, cell_px, cell_py, cw, ch, &fg, total_w,
+                            pixels, first_char, cell_px, cell_py, cw, ch, &fg, total_w,
                         );
                     } else if is_braille(first_char) {
                         draw_braille(
-                            &mut pixels, first_char, cell_px, cell_py, cw, ch, &fg, total_w,
+                            pixels, first_char, cell_px, cell_py, cw, ch, &fg, total_w,
                         );
                     } else if font.has_glyph(first_char) {
                         let (metrics, bitmap) = font.get_glyph(first_char);
                         draw_glyph(
-                            &mut pixels, &bitmap, &metrics, cell_px, cell_py, cw, ch,
-                            font.baseline, &fg, total_w,
+                            pixels, bitmap, metrics, cell_px, cell_py, cw, ch,
+                            baseline, &fg, total_w,
                         );
                     }
                     // Characters not in the font are silently skipped (no .notdef box).
@@ -54,9 +57,7 @@ pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager) -> Vec<u
         }
     }
 
-    flip_rows_vertical(&mut pixels, total_w, total_h);
-
-    pixels
+    flip_rows_vertical(pixels, total_w, total_h);
 }
 
 // ─── Braille renderer ────────────────────────────────────────────────────────

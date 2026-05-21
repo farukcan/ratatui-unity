@@ -17,6 +17,7 @@ namespace RatatuiUnity
     public sealed class CanvasBuilder
     {
         private readonly RatatuiTerminal _term;
+        private bool _rendered;
 
         internal CanvasBuilder(
             RatatuiTerminal term,
@@ -33,6 +34,7 @@ namespace RatatuiUnity
         /// <summary>Draw the world map.</summary>
         public CanvasBuilder Map(MapResolution resolution = MapResolution.High)
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_canvas_map(_term.Handle, (byte)resolution);
             return this;
         }
@@ -43,6 +45,7 @@ namespace RatatuiUnity
         /// </summary>
         public CanvasBuilder Layer()
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_canvas_layer(_term.Handle);
             return this;
         }
@@ -50,6 +53,7 @@ namespace RatatuiUnity
         /// <summary>Draw a line segment.</summary>
         public CanvasBuilder Line(double x1, double y1, double x2, double y2, Color color)
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_canvas_line(
                 _term.Handle, x1, y1, x2, y2,
                 (byte)(color.r * 255), (byte)(color.g * 255), (byte)(color.b * 255));
@@ -59,6 +63,7 @@ namespace RatatuiUnity
         /// <summary>Draw a circle outline.</summary>
         public CanvasBuilder Circle(double x, double y, double radius, Color color)
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_canvas_circle(
                 _term.Handle, x, y, radius,
                 (byte)(color.r * 255), (byte)(color.g * 255), (byte)(color.b * 255));
@@ -68,6 +73,7 @@ namespace RatatuiUnity
         /// <summary>Draw a rectangle outline.</summary>
         public CanvasBuilder Rectangle(double x, double y, double width, double height, Color color)
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_canvas_rectangle(
                 _term.Handle, x, y, width, height,
                 (byte)(color.r * 255), (byte)(color.g * 255), (byte)(color.b * 255));
@@ -77,6 +83,7 @@ namespace RatatuiUnity
         /// <summary>Print a text label at the given canvas coordinates.</summary>
         public CanvasBuilder Text(double x, double y, string text, Color color)
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_canvas_text(
                 _term.Handle, x, y, text ?? string.Empty,
                 (byte)(color.r * 255), (byte)(color.g * 255), (byte)(color.b * 255));
@@ -89,6 +96,7 @@ namespace RatatuiUnity
         /// </summary>
         public CanvasBuilder Points(double[] coords, Color color)
         {
+            ThrowIfRendered();
             if (coords == null || coords.Length < 2) return this;
             RatatuiNative.ratatui_canvas_points(
                 _term.Handle, coords, (uint)(coords.Length / 2),
@@ -102,7 +110,16 @@ namespace RatatuiUnity
         /// </summary>
         public void Render()
         {
+            ThrowIfRendered();
+            _rendered = true;
             RatatuiNative.ratatui_canvas_end(_term.Handle);
+        }
+
+        private void ThrowIfRendered()
+        {
+            if (_rendered)
+                throw new System.InvalidOperationException(
+                    "CanvasBuilder has already been rendered.");
         }
     }
 }

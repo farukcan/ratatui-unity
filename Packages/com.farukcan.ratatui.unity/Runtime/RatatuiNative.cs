@@ -77,34 +77,34 @@ namespace RatatuiUnity
 
         // ── Widgets ───────────────────────────────────────────────────────────
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_block(
             IntPtr handle, uint areaId,
-            [MarshalAs(UnmanagedType.LPStr)] string title,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string title,
             byte borders);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_paragraph(
             IntPtr handle, uint areaId,
-            [MarshalAs(UnmanagedType.LPStr)] string text,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string text,
             byte alignment, byte wrap);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_list(
             IntPtr handle, uint areaId,
-            [MarshalAs(UnmanagedType.LPStr)] string items,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string items,
             int selected);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_gauge(
             IntPtr handle, uint areaId,
             float ratio,
-            [MarshalAs(UnmanagedType.LPStr)] string label);
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string label);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_tabs(
             IntPtr handle, uint areaId,
-            [MarshalAs(UnmanagedType.LPStr)] string titles,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string titles,
             uint selected);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
@@ -112,10 +112,10 @@ namespace RatatuiUnity
             IntPtr handle, uint areaId,
             ulong[] data, uint len);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_table(
             IntPtr handle, uint areaId,
-            [MarshalAs(UnmanagedType.LPStr)] string data);
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string data);
 
         /// Returns a new area ID representing the inside of <paramref name="areaId"/> shrunk by
         /// the given margin on each side.  Typical usage: horizontal=1, vertical=1 to get the
@@ -132,17 +132,17 @@ namespace RatatuiUnity
 
         // ── New widgets ───────────────────────────────────────────────────────
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_barchart(
             IntPtr handle, uint areaId,
-            [MarshalAs(UnmanagedType.LPStr)] string data,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string data,
             ushort barWidth, ushort barGap);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_line_gauge(
             IntPtr handle, uint areaId,
             float ratio,
-            [MarshalAs(UnmanagedType.LPStr)] string label);
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string label);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_scrollbar(
@@ -155,10 +155,10 @@ namespace RatatuiUnity
             IntPtr handle, uint areaId,
             int year, byte month, byte day);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_table_ex(
             IntPtr handle, uint areaId,
-            [MarshalAs(UnmanagedType.LPStr)] string data,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string data,
             byte[] colTypes, ushort[] colValues, uint colCount,
             int selectedRow);
 
@@ -168,10 +168,10 @@ namespace RatatuiUnity
         internal static extern void ratatui_styled_para_begin(
             IntPtr handle, uint areaId, byte alignment, byte wrap);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_styled_para_span(
             IntPtr handle,
-            [MarshalAs(UnmanagedType.LPStr)] string text,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string text,
             byte fgR, byte fgG, byte fgB, byte useDefaultFg,
             byte bgR, byte bgG, byte bgB, byte useDefaultBg,
             byte modifiers);
@@ -187,22 +187,22 @@ namespace RatatuiUnity
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_chart_begin(IntPtr handle, uint areaId);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_chart_x_axis(
             IntPtr handle,
-            [MarshalAs(UnmanagedType.LPStr)] string title,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string title,
             double min, double max);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_chart_y_axis(
             IntPtr handle,
-            [MarshalAs(UnmanagedType.LPStr)] string title,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string title,
             double min, double max);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_chart_dataset(
             IntPtr handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
             byte marker,
             byte r, byte g, byte b,
             double[] data, uint pointCount);
@@ -243,11 +243,11 @@ namespace RatatuiUnity
             double x, double y, double w, double h,
             byte r, byte g, byte b);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_canvas_text(
             IntPtr handle,
             double x, double y,
-            [MarshalAs(UnmanagedType.LPStr)] string text,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string text,
             byte r, byte g, byte b);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

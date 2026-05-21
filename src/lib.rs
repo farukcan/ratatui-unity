@@ -88,8 +88,7 @@ pub extern "C" fn ratatui_end_frame(handle: *mut c_void) -> *const u8 {
     if handle.is_null() { return std::ptr::null(); }
     let state = unsafe { state_mut(handle) };
     render_all_commands(state);
-    let buffer = state.terminal.backend().buffer().clone();
-    state.pixel_buffer = renderer::render_buffer_to_pixels(&buffer, &mut state.font);
+    state.rasterize();
     state.pixel_buffer.as_ptr()
 }
 

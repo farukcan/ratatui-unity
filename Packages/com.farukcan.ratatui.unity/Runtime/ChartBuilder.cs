@@ -17,6 +17,7 @@ namespace RatatuiUnity
     public sealed class ChartBuilder
     {
         private readonly RatatuiTerminal _term;
+        private bool _rendered;
 
         internal ChartBuilder(RatatuiTerminal term, uint areaId)
         {
@@ -27,6 +28,7 @@ namespace RatatuiUnity
         /// <summary>Configure the horizontal axis label and data bounds.</summary>
         public ChartBuilder XAxis(string title, double min, double max)
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_chart_x_axis(_term.Handle, title ?? string.Empty, min, max);
             return this;
         }
@@ -34,6 +36,7 @@ namespace RatatuiUnity
         /// <summary>Configure the vertical axis label and data bounds.</summary>
         public ChartBuilder YAxis(string title, double min, double max)
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_chart_y_axis(_term.Handle, title ?? string.Empty, min, max);
             return this;
         }
@@ -48,6 +51,7 @@ namespace RatatuiUnity
             Color color,
             double[] data)
         {
+            ThrowIfRendered();
             if (data == null || data.Length < 2) return this;
             RatatuiNative.ratatui_chart_dataset(
                 _term.Handle,
@@ -65,7 +69,16 @@ namespace RatatuiUnity
         /// </summary>
         public void Render()
         {
+            ThrowIfRendered();
+            _rendered = true;
             RatatuiNative.ratatui_chart_end(_term.Handle);
+        }
+
+        private void ThrowIfRendered()
+        {
+            if (_rendered)
+                throw new System.InvalidOperationException(
+                    "ChartBuilder has already been rendered.");
         }
     }
 }

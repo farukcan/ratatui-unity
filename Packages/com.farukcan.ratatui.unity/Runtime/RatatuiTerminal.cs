@@ -442,6 +442,11 @@ namespace RatatuiUnity
 
         // ── IDisposable ───────────────────────────────────────────────────────
 
+        ~RatatuiTerminal()
+        {
+            Dispose();
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -452,6 +457,7 @@ namespace RatatuiUnity
                     _handle = IntPtr.Zero;
                 }
                 _disposed = true;
+                GC.SuppressFinalize(this);
             }
         }
 

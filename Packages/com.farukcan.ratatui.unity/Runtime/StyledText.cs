@@ -19,6 +19,7 @@ namespace RatatuiUnity
     public sealed class StyledText
     {
         private readonly RatatuiTerminal _term;
+        private bool _rendered;
 
         internal StyledText(RatatuiTerminal term, uint areaId, Alignment alignment, bool wrap)
         {
@@ -38,6 +39,7 @@ namespace RatatuiUnity
             Color bg = default,
             Modifier modifiers = Modifier.None)
         {
+            ThrowIfRendered();
             bool defFg = fg.a < 0.01f;
             bool defBg = bg.a < 0.01f;
             RatatuiNative.ratatui_styled_para_span(
@@ -51,6 +53,7 @@ namespace RatatuiUnity
         /// <summary>Move to a new line in the paragraph.</summary>
         public StyledText Line()
         {
+            ThrowIfRendered();
             RatatuiNative.ratatui_styled_para_newline(_term.Handle);
             return this;
         }
@@ -72,7 +75,16 @@ namespace RatatuiUnity
         /// </summary>
         public void Render()
         {
+            ThrowIfRendered();
+            _rendered = true;
             RatatuiNative.ratatui_styled_para_end(_term.Handle);
+        }
+
+        private void ThrowIfRendered()
+        {
+            if (_rendered)
+                throw new System.InvalidOperationException(
+                    "StyledText has already been rendered.");
         }
     }
 }

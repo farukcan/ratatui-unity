@@ -244,4 +244,11 @@ impl TerminalState {
     pub fn take_style(&mut self) -> Style {
         std::mem::replace(&mut self.pending_style, Style::default())
     }
+
+    /// Rasterize the terminal buffer into the pixel buffer.
+    /// Uses disjoint field borrows to avoid cloning the buffer.
+    pub fn rasterize(&mut self) {
+        let buffer = self.terminal.backend().buffer();
+        crate::renderer::render_buffer_to_pixels(buffer, &mut self.font, &mut self.pixel_buffer);
+    }
 }

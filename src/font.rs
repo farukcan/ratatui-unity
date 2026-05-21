@@ -61,15 +61,13 @@ impl FontManager {
         self.font.lookup_glyph_index(ch) != 0
     }
 
-    /// Returns (metrics, coverage_bitmap) for a character, using the cache.
-    /// Returns an empty bitmap if the character is not present in the font
-    /// so that the caller can skip rendering rather than drawing .notdef (a box).
-    pub fn get_glyph(&mut self, ch: char) -> (Metrics, Vec<u8>) {
-        if let Some(entry) = self.glyph_cache.get(&ch) {
-            return (entry.0, entry.1.clone());
+    /// Returns a reference to (metrics, coverage_bitmap) for a character, using the cache.
+    /// The entry is rasterized on first access and cached for subsequent calls.
+    pub fn get_glyph(&mut self, ch: char) -> &(Metrics, Vec<u8>) {
+        if !self.glyph_cache.contains_key(&ch) {
+            let (metrics, bitmap) = self.font.rasterize(ch, self.font_size);
+            self.glyph_cache.insert(ch, (metrics, bitmap));
         }
-        let (metrics, bitmap) = self.font.rasterize(ch, self.font_size);
-        self.glyph_cache.insert(ch, (metrics, bitmap.clone()));
-        (metrics, bitmap)
+        self.glyph_cache.get(&ch).unwrap()
     }
 }

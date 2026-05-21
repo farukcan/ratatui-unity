@@ -28,7 +28,7 @@ namespace RatatuiUnity
         /// <summary>Render all widgets for this tab into <paramref name="area"/>.</summary>
         void Render(RatatuiTerminal term, uint area);
 
-        /// <summary>[Deprecated] Use OnKeyEvent instead.</summary>
+        [System.Obsolete("Use OnKeyEvent instead")]
         void OnInput(KeyCode key);
     }
 }

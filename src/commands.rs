@@ -67,7 +67,7 @@ pub fn do_split(
 /// Replays all queued widget commands inside a single `terminal.draw()` call.
 pub fn render_all_commands(state: &mut TerminalState) {
     let commands = std::mem::take(&mut state.commands);
-    let area_map = state.area_map.clone();
+    let area_map = std::mem::take(&mut state.area_map);
 
     state
         .terminal
@@ -283,7 +283,8 @@ pub fn render_all_commands(state: &mut TerminalState) {
         })
         .expect("terminal draw failed");
 
-    state.commands = commands;
+    state.area_map = area_map;
+    // commands are intentionally dropped here — begin_frame() would clear them anyway
 }
 
 // ─── Table helpers ────────────────────────────────────────────────────────────
