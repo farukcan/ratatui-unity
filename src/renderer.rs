@@ -2,10 +2,16 @@ use crate::color::color_to_rgba;
 use crate::font::FontManager;
 use fontdue::Metrics;
 use ratatui::buffer::Buffer;
+use ratatui::style::Color;
 
 /// Converts a ratatui `Buffer` (cell grid) into a flat RGBA pixel buffer.
 /// Reuses the provided `pixels` Vec to avoid per-frame allocation.
-pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager, pixels: &mut Vec<u8>) {
+pub fn render_buffer_to_pixels(
+    buffer: &Buffer,
+    font: &mut FontManager,
+    pixels: &mut Vec<u8>,
+    background_color: [u8; 4],
+) {
     let area = buffer.area();
     let cols = area.width as u32;
     let rows = area.height as u32;
@@ -14,7 +20,6 @@ pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager, pixels: 
     let baseline = font.baseline;
     let total_w = cols * cw;
     let total_h = rows * ch;
-
     let required = (total_w * total_h * 4) as usize;
     pixels.resize(required, 0);
     pixels.fill(0);
@@ -27,7 +32,11 @@ pub fn render_buffer_to_pixels(buffer: &Buffer, font: &mut FontManager, pixels: 
             };
 
             let fg = color_to_rgba(cell.fg, true);
-            let bg = color_to_rgba(cell.bg, false);
+            let bg = if cell.bg == Color::Reset {
+                background_color
+            } else {
+                color_to_rgba(cell.bg, false)
+            };
             let cell_px = col * cw;
             let cell_py = row * ch;
 

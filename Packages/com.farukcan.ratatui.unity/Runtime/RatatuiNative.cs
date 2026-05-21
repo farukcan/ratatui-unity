@@ -42,6 +42,10 @@ namespace RatatuiUnity
         internal static extern IntPtr ratatui_end_frame(IntPtr handle);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ratatui_set_background_color(
+            IntPtr handle, byte r, byte g, byte b, byte a);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint ratatui_pixel_width(IntPtr handle);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

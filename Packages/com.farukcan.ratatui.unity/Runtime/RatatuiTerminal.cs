@@ -391,6 +391,34 @@ namespace RatatuiUnity
             SetStyle(fg, bg, (byte)modifiers);
         }
 
+        /// <summary>
+        /// Set the terminal background color. This is the color used for cells
+        /// that have no explicit background set. Must be called before
+        /// <see cref="BeginFrame"/> for the change to take effect in that frame.
+        /// </summary>
+        /// <param name="r">Red component (0–255).</param>
+        /// <param name="g">Green component (0–255).</param>
+        /// <param name="b">Blue component (0–255).</param>
+        /// <param name="a">Alpha component (0–255). Use 255 for fully opaque.</param>
+        public void SetBackgroundColor(byte r, byte g, byte b, byte a = 255)
+        {
+            ThrowIfDisposed();
+            RatatuiNative.ratatui_set_background_color(_handle, r, g, b, a);
+        }
+
+        /// <summary>
+        /// Convenience overload: Set the background color using a Unity <see cref="Color"/>.
+        /// Alpha is taken from <c>color.a</c>.
+        /// </summary>
+        public void SetBackgroundColor(Color color)
+        {
+            SetBackgroundColor(
+                (byte)(color.r * 255),
+                (byte)(color.g * 255),
+                (byte)(color.b * 255),
+                (byte)(color.a * 255));
+        }
+
         // ── Input / Hit-Testing ───────────────────────────────────────────────
 
         /// <summary>

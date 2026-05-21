@@ -29,6 +29,9 @@ namespace RatatuiUnity
         [Tooltip("Derive cols/rows from the RawImage RectTransform size instead of using fixed values.")]
         [SerializeField] private bool _fitIntoRectTransform;
 
+        [Tooltip("The background color of the terminal (alpha is ignored — texture is always opaque).")]
+        [SerializeField] private Color _backgroundColor = new Color(0.102f, 0.102f, 0.18f); // dark navy
+
         [Header("Target (optional)")]
         [Tooltip("Assign to a UI RawImage to display the terminal texture.")]
         [SerializeField] private RawImage _rawImage;
@@ -104,6 +107,7 @@ namespace RatatuiUnity
                 CalculateColsRowsFromRectTransform();
 
             Terminal = new RatatuiTerminal(_cols, _rows, _fontSize);
+            Terminal.SetBackgroundColor(_backgroundColor);
             Texture = new Texture2D(
                 Terminal.PixelWidth,
                 Terminal.PixelHeight,

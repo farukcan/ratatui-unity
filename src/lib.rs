@@ -43,6 +43,20 @@ fn style_from_rgba(
     style
 }
 
+// ─── Background color ─────────────────────────────────────────────────────────
+
+/// Set the terminal background color (RGBA).
+/// Must be called before `ratatui_begin_frame` for the change to take effect.
+#[no_mangle]
+pub extern "C" fn ratatui_set_background_color(
+    handle: *mut c_void,
+    r: u8, g: u8, b: u8, a: u8,
+) {
+    if handle.is_null() { return; }
+    let state = unsafe { state_mut(handle) };
+    state.background_color = [r, g, b, a];
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 /// Create a terminal instance and return an opaque handle.

@@ -189,6 +189,8 @@ pub struct TerminalState {
     pub pending_styled_para: Option<PendingStyledParagraph>,
     pub pending_chart: Option<PendingChart>,
     pub pending_canvas: Option<PendingCanvas>,
+    /// RGBA background color used during rasterization. Defaults to dark navy.
+    pub background_color: [u8; 4],
 }
 
 impl TerminalState {
@@ -216,6 +218,7 @@ impl TerminalState {
             pending_styled_para: None,
             pending_chart: None,
             pending_canvas: None,
+            background_color: crate::color::DEFAULT_BG,
         }
     }
 
@@ -249,6 +252,11 @@ impl TerminalState {
     /// Uses disjoint field borrows to avoid cloning the buffer.
     pub fn rasterize(&mut self) {
         let buffer = self.terminal.backend().buffer();
-        crate::renderer::render_buffer_to_pixels(buffer, &mut self.font, &mut self.pixel_buffer);
+        crate::renderer::render_buffer_to_pixels(
+            buffer,
+            &mut self.font,
+            &mut self.pixel_buffer,
+            self.background_color,
+        );
     }
 }
