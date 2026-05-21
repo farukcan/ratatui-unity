@@ -25,6 +25,9 @@ namespace RatatuiUnity
         [Tooltip("Font size in pixels (affects texture resolution).")]
         [SerializeField] private float _fontSize = 14f;
 
+        [Tooltip("Derive cols/rows from the RawImage RectTransform size instead of using fixed values.")]
+        [SerializeField] private bool _fitIntoRectTransform;
+
         [Header("Target (optional)")]
         [Tooltip("Assign to a UI RawImage to display the terminal texture.")]
         [SerializeField] private RawImage _rawImage;
@@ -93,6 +96,9 @@ namespace RatatuiUnity
 
         protected virtual void Awake()
         {
+            if (_fitIntoRectTransform)
+                CalculateColsRowsFromRectTransform();
+
             Terminal = new RatatuiTerminal(_cols, _rows, _fontSize);
             Texture  = new Texture2D(
                 Terminal.PixelWidth,
@@ -414,7 +420,8 @@ namespace RatatuiUnity
             if (_rawImage != null)
             {
                 _rawImage.texture = Texture;
-                FitRawImageToTexture();
+                if (!_fitIntoRectTransform)
+                    FitRawImageToTexture();
             }
 
             if (_meshRenderer != null && _meshRenderer.material != null)
@@ -430,6 +437,37 @@ namespace RatatuiUnity
             if (_rawImage == null || Terminal == null) return;
             var rt = _rawImage.rectTransform;
             rt.sizeDelta = new Vector2(Terminal.PixelWidth, Terminal.PixelHeight);
+        }
+
+        private void CalculateColsRowsFromRectTransform()
+        {
+            if (_rawImage == null)
+            {
+                Debug.LogWarning(
+                    "[RatatuiRenderer] FitIntoRectTransform requires a RawImage target.", this);
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            Rect rect = _rawImage.rectTransform.rect;
+
+            if (rect.width <= 0f || rect.height <= 0f)
+            {
+                Debug.LogWarning(
+                    "[RatatuiRenderer] RectTransform has zero size, cannot fit terminal.", this);
+                return;
+            }
+
+            // Create a probe terminal to get cell dimensions for this font size
+            using (var probe = new RatatuiTerminal(1, 1, _fontSize))
+            {
+                int cellWidth = probe.CellWidth;
+                int cellHeight = probe.CellHeight;
+                if (cellWidth <= 0 || cellHeight <= 0) return;
+
+                _cols = Mathf.Max(1, Mathf.FloorToInt(rect.width / cellWidth));
+                _rows = Mathf.Max(1, Mathf.FloorToInt(rect.height / cellHeight));
+            }
         }
     }
 }
