@@ -123,10 +123,12 @@ build_linux() {
 # ── Windows ───────────────────────────────────────────────────────────────────
 build_windows() {
   log "=== Windows x86_64 (via cross) ==="
-  cross build --release --target x86_64-pc-windows-msvc
+  # Uses x86_64-pc-windows-gnu (MinGW) because cross cannot target MSVC
+  # from non-Windows hosts. CI uses x86_64-pc-windows-msvc on a Windows runner.
+  cross build --release --target x86_64-pc-windows-gnu
 
   mkdir -p "$PLUGINS/Windows/x86_64"
-  cp "$RELEASE/x86_64-pc-windows-msvc/release/ratatui_unity.dll" \
+  cp "$RELEASE/x86_64-pc-windows-gnu/release/ratatui_unity.dll" \
      "$PLUGINS/Windows/x86_64/"
 
   log "Windows: $PLUGINS/Windows/x86_64/ratatui_unity.dll"
