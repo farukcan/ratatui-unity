@@ -8,7 +8,9 @@ namespace RatatuiUnity
     /// MonoBehaviour that renders a Ratatui terminal to a <see cref="Texture2D"/>
     /// and optionally assigns it to a UI <see cref="RawImage"/> or a
     /// <see cref="MeshRenderer"/> material each frame.
-    /// When no target is assigned, falls back to OnGUI rendering (centered on screen).
+    /// When no target is assigned, falls back to OnGUI rendering.
+    /// Use <see cref="OnGuiMode.Full"/> to stretch the terminal to the entire screen,
+    /// or <see cref="OnGuiMode.Partial"/> to draw at native pixel size with configurable alignment.
     ///
     /// Override <see cref="BuildFrame"/> to define widget layout.
     /// Override <see cref="OnTerminalKeyDown"/>, <see cref="OnTerminalMouseEvent"/>,
@@ -38,6 +40,16 @@ namespace RatatuiUnity
 
         [Tooltip("Assign to render the terminal texture onto a 3D mesh.")]
         [SerializeField] private Renderer _meshRenderer;
+
+        [Header("OnGUI")]
+        [Tooltip("Full: stretch to entire screen. Partial: native texture size with alignment.")]
+        [SerializeField] private OnGuiMode _onGuiMode = OnGuiMode.Full;
+
+        [Tooltip("Horizontal placement when OnGUI mode is Partial.")]
+        [SerializeField] private OnGuiHorizontalAlign _onGuiHorizontalAlign = OnGuiHorizontalAlign.Center;
+
+        [Tooltip("Vertical placement when OnGUI mode is Partial.")]
+        [SerializeField] private OnGuiVerticalAlign _onGuiVerticalAlign = OnGuiVerticalAlign.Center;
 
         [Header("Input Settings")]
         [Tooltip("Enable input processing (keyboard + mouse).")]
@@ -456,9 +468,31 @@ namespace RatatuiUnity
         private void UpdateOnGuiRect()
         {
             if (Texture == null) return;
-            float x = (Screen.width - Texture.width) * 0.5f;
-            float y = (Screen.height - Texture.height) * 0.5f;
-            _onGuiRect = new Rect(x, y, Texture.width, Texture.height);
+
+            if (_onGuiMode == OnGuiMode.Full)
+            {
+                _onGuiRect = new Rect(0f, 0f, Screen.width, Screen.height);
+                return;
+            }
+
+            float w = Texture.width;
+            float h = Texture.height;
+
+            float x = _onGuiHorizontalAlign switch
+            {
+                OnGuiHorizontalAlign.Left   => 0f,
+                OnGuiHorizontalAlign.Right  => Screen.width - w,
+                _                           => (Screen.width - w) * 0.5f,
+            };
+
+            float y = _onGuiVerticalAlign switch
+            {
+                OnGuiVerticalAlign.Top    => 0f,
+                OnGuiVerticalAlign.Bottom => Screen.height - h,
+                _                         => (Screen.height - h) * 0.5f,
+            };
+
+            _onGuiRect = new Rect(x, y, w, h);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────

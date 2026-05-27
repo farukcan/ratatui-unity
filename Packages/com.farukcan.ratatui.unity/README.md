@@ -39,6 +39,19 @@ Or add to `Packages/manifest.json`:
 3. Create a UI Canvas with a **RawImage** and assign it to the `Raw Image` field.
 4. Press Play.
 
+## OnGUI Fallback
+
+When neither **Raw Image** nor **Mesh Renderer** is assigned, `RatatuiRenderer` draws the terminal via `OnGUI` instead of UI/3D targets.
+
+| Mode | Behavior |
+| ---- | -------- |
+| **Full** | Stretches the terminal texture to fill the entire screen. Serialized cols/rows still define the character grid; only the display rect is fullscreen. |
+| **Partial** | Draws at the terminal's native pixel size (cols × rows × cell size). Position with **Horizontal Align** (Left / Center / Right) and **Vertical Align** (Top / Center / Bottom). |
+
+Default mode is **Full**. For the previous centered native-size behavior, use **Partial** + Center + Center.
+
+Mouse and keyboard input are mapped to the active OnGUI rect in both modes.
+
 ## Custom Layout
 
 Subclass `RatatuiRenderer` and override `BuildFrame`:
