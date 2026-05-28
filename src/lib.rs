@@ -45,12 +45,12 @@ fn style_from_rgba(
 
 // ─── Background color ─────────────────────────────────────────────────────────
 
-/// Set the terminal background color (RGBA).
+/// Set the terminal background color (RGB).
 /// Must be called before `ratatui_begin_frame` for the change to take effect.
 #[no_mangle]
 pub extern "C" fn ratatui_set_background_color(
     handle: *mut c_void,
-    r: u8, g: u8, b: u8, _a: u8,
+    r: u8, g: u8, b: u8,
 ) {
     if handle.is_null() { return; }
     let state = unsafe { state_mut(handle) };
@@ -121,11 +121,11 @@ pub extern "C" fn ratatui_end_frame_hashed(handle: *mut c_void) -> *const u8 {
         crate::renderer::compute_buffer_hash(buffer)
     };
 
-    if hash == state.last_buffer_hash {
+    if state.last_buffer_hash == Some(hash) {
         return std::ptr::null();
     }
 
-    state.last_buffer_hash = hash;
+    state.last_buffer_hash = Some(hash);
     state.rasterize();
     state.pixel_buffer.as_ptr()
 }

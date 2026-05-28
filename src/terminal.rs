@@ -192,7 +192,8 @@ pub struct TerminalState {
     /// RGB background color used during rasterization. Defaults to dark navy.
     pub background_color: [u8; 3],
     /// Hash of the ratatui Buffer from the previous frame (for dirty-checking).
-    pub last_buffer_hash: u64,
+    /// `None` on the first frame to guarantee initial render.
+    pub last_buffer_hash: Option<u64>,
 }
 
 impl TerminalState {
@@ -221,7 +222,7 @@ impl TerminalState {
             pending_chart: None,
             pending_canvas: None,
             background_color: crate::color::DEFAULT_BG,
-            last_buffer_hash: 0,
+            last_buffer_hash: None,
         }
     }
 

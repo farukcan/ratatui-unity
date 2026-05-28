@@ -24,6 +24,9 @@ namespace RatatuiUnity
         private ushort[] _splitValues = new ushort[8];
         private uint[]   _splitOutIds = new uint[8];
 
+        /// <summary>Bytes per pixel in the native pixel buffer (RGB24).</summary>
+        public const int BytesPerPixel = 3;
+
         /// <summary>Width of the rendered texture in pixels.</summary>
         public int PixelWidth  { get; private set; }
 
@@ -119,7 +122,7 @@ namespace RatatuiUnity
         {
             IntPtr ptr = EndFrameRaw();
             if (ptr == IntPtr.Zero) return Array.Empty<byte>();
-            int byteCount = PixelWidth * PixelHeight * 3;
+            int byteCount = PixelWidth * PixelHeight * BytesPerPixel;
             byte[] pixels = new byte[byteCount];
             Marshal.Copy(ptr, pixels, 0, byteCount);
             return pixels;
@@ -412,24 +415,22 @@ namespace RatatuiUnity
         /// <param name="r">Red component (0–255).</param>
         /// <param name="g">Green component (0–255).</param>
         /// <param name="b">Blue component (0–255).</param>
-        /// <param name="a">Alpha component (0–255). Use 255 for fully opaque.</param>
-        public void SetBackgroundColor(byte r, byte g, byte b, byte a = 255)
+        public void SetBackgroundColor(byte r, byte g, byte b)
         {
             ThrowIfDisposed();
-            RatatuiNative.ratatui_set_background_color(_handle, r, g, b, a);
+            RatatuiNative.ratatui_set_background_color(_handle, r, g, b);
         }
 
         /// <summary>
         /// Convenience overload: Set the background color using a Unity <see cref="Color"/>.
-        /// Alpha is taken from <c>color.a</c>.
+        /// Alpha channel is ignored — the terminal background is always opaque.
         /// </summary>
         public void SetBackgroundColor(Color color)
         {
             SetBackgroundColor(
                 (byte)(color.r * 255),
                 (byte)(color.g * 255),
-                (byte)(color.b * 255),
-                (byte)(color.a * 255));
+                (byte)(color.b * 255));
         }
 
         // ── Input / Hit-Testing ───────────────────────────────────────────────

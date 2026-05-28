@@ -167,7 +167,7 @@ namespace RatatuiUnity
                 float interval = 1f / _maxRenderFps;
                 if (_renderTimer < interval)
                     return;
-                _renderTimer -= interval;
+                _renderTimer = Mathf.Min(_renderTimer - interval, interval);
             }
 
             Terminal.BeginFrame();
@@ -178,7 +178,7 @@ namespace RatatuiUnity
             IntPtr ptr = Terminal.EndFrameRawIfDirty();
             if (ptr != IntPtr.Zero)
             {
-                int byteCount = Terminal.PixelWidth * Terminal.PixelHeight * 3;
+                int byteCount = Terminal.PixelWidth * Terminal.PixelHeight * RatatuiTerminal.BytesPerPixel;
                 Texture.LoadRawTextureData(ptr, byteCount);
                 Texture.Apply(updateMipmaps: false);
             }
@@ -428,6 +428,11 @@ namespace RatatuiUnity
                 _lastRayScreenPos = screenPos;
 
                 Camera cam = _cachedMainCamera;
+                if (cam == null)
+                {
+                    _cachedMainCamera = Camera.main;
+                    cam = _cachedMainCamera;
+                }
                 if (cam == null)
                 {
                     _lastRayValid = false;
