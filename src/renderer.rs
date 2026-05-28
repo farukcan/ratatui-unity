@@ -1,16 +1,36 @@
-use crate::color::color_to_rgba;
+use crate::color::color_to_rgb;
 use crate::font::FontManager;
 use fontdue::Metrics;
 use ratatui::buffer::Buffer;
 use ratatui::style::Color;
+use rustc_hash::FxHasher;
+use std::hash::{Hash, Hasher};
 
-/// Converts a ratatui `Buffer` (cell grid) into a flat RGBA pixel buffer.
+/// Computes a hash over all cell fields that affect visual output.
+/// Used for dirty-checking: if hash is unchanged, pixel rasterization can be skipped.
+pub fn compute_buffer_hash(buffer: &Buffer) -> u64 {
+    let mut hasher = FxHasher::default();
+    let area = buffer.area();
+    for row in 0..area.height {
+        for col in 0..area.width {
+            if let Some(cell) = buffer.cell((col + area.x, row + area.y)) {
+                cell.symbol().hash(&mut hasher);
+                cell.fg.hash(&mut hasher);
+                cell.bg.hash(&mut hasher);
+                cell.modifier.hash(&mut hasher);
+            }
+        }
+    }
+    hasher.finish()
+}
+
+/// Converts a ratatui `Buffer` (cell grid) into a flat RGB24 pixel buffer.
 /// Reuses the provided `pixels` Vec to avoid per-frame allocation.
 pub fn render_buffer_to_pixels(
     buffer: &Buffer,
     font: &mut FontManager,
     pixels: &mut Vec<u8>,
-    background_color: [u8; 4],
+    background_color: [u8; 3],
 ) {
     let area = buffer.area();
     let cols = area.width as u32;
@@ -20,9 +40,8 @@ pub fn render_buffer_to_pixels(
     let baseline = font.baseline;
     let total_w = cols * cw;
     let total_h = rows * ch;
-    let required = (total_w * total_h * 4) as usize;
+    let required = (total_w * total_h * 3) as usize;
     pixels.resize(required, 0);
-    pixels.fill(0);
 
     for row in 0..rows {
         for col in 0..cols {
@@ -31,11 +50,11 @@ pub fn render_buffer_to_pixels(
                 None => continue,
             };
 
-            let fg = color_to_rgba(cell.fg, true);
+            let fg = color_to_rgb(cell.fg, true);
             let bg = if cell.bg == Color::Reset {
                 background_color
             } else {
-                color_to_rgba(cell.bg, false)
+                color_to_rgb(cell.bg, false)
             };
             let cell_px = col * cw;
             let cell_py = row * ch;
@@ -66,7 +85,6 @@ pub fn render_buffer_to_pixels(
         }
     }
 
-    flip_rows_vertical(pixels, total_w, total_h);
 }
 
 // ─── Braille renderer ────────────────────────────────────────────────────────
@@ -88,7 +106,7 @@ fn draw_braille(
     cell_py: u32,
     cw: u32,
     ch_h: u32,
-    fg: &[u8; 4],
+    fg: &[u8; 3],
     total_w: u32,
 ) {
     let bits = ch as u32 - 0x2800;
@@ -119,8 +137,8 @@ fn draw_braille(
 
         for py in y0..y1 {
             for px in x0..x1 {
-                let idx = (py * total_w + px) as usize * 4;
-                if let Some(dst) = pixels.get_mut(idx..idx + 4) {
+                let idx = (py * total_w + px) as usize * 3;
+                if let Some(dst) = pixels.get_mut(idx..idx + 3) {
                     dst.copy_from_slice(fg);
                 }
             }
@@ -147,7 +165,7 @@ fn draw_block_element(
     cell_py: u32,
     cw: u32,
     ch_h: u32,
-    fg: &[u8; 4],
+    fg: &[u8; 3],
     total_w: u32,
 ) {
     // Fraction of the cell (from the bottom) that this block covers.
@@ -189,13 +207,13 @@ fn fill_cell_rows(
     cw: u32,
     row_start: u32,
     row_end: u32,
-    fg: &[u8; 4],
+    fg: &[u8; 3],
     total_w: u32,
 ) {
     for py in row_start..row_end {
         for px in 0..cw {
-            let idx = ((cell_py + py) * total_w + (cell_px + px)) as usize * 4;
-            if let Some(dst) = pixels.get_mut(idx..idx + 4) {
+            let idx = ((cell_py + py) * total_w + (cell_px + px)) as usize * 3;
+            if let Some(dst) = pixels.get_mut(idx..idx + 3) {
                 dst.copy_from_slice(fg);
             }
         }
@@ -210,7 +228,7 @@ fn draw_box_drawing(
     cell_py: u32,
     cw: u32,
     ch_h: u32,
-    fg: &[u8; 4],
+    fg: &[u8; 3],
     total_w: u32,
 ) {
     let mid_x = cell_px + cw / 2;
@@ -224,8 +242,8 @@ fn draw_box_drawing(
         let x_start = if left { cell_px } else { mid_x };
         let x_end = if right { cell_px + cw } else { mid_x + 1 };
         for x in x_start..x_end {
-            let idx = (mid_y * total_w + x) as usize * 4;
-            if let Some(dst) = pixels.get_mut(idx..idx + 4) {
+            let idx = (mid_y * total_w + x) as usize * 3;
+            if let Some(dst) = pixels.get_mut(idx..idx + 3) {
                 dst.copy_from_slice(fg);
             }
         }
@@ -236,8 +254,8 @@ fn draw_box_drawing(
         let y_start = if up { cell_py } else { mid_y };
         let y_end = if down { cell_py + ch_h } else { mid_y + 1 };
         for y in y_start..y_end {
-            let idx = (y * total_w + mid_x) as usize * 4;
-            if let Some(dst) = pixels.get_mut(idx..idx + 4) {
+            let idx = (y * total_w + mid_x) as usize * 3;
+            if let Some(dst) = pixels.get_mut(idx..idx + 3) {
                 dst.copy_from_slice(fg);
             }
         }
@@ -262,23 +280,6 @@ fn box_drawing_segments(ch: char) -> (bool, bool, bool, bool) {
     }
 }
 
-// ─── Y-axis flip ─────────────────────────────────────────────────────────────
-
-/// Flips the pixel buffer vertically in-place (top ↔ bottom row swap).
-///
-/// Unity's `Texture2D.LoadRawTextureData` expects rows in bottom-to-top order
-/// (OpenGL convention), while ratatui renders top-to-bottom. This function
-/// reconciles the two coordinate systems without touching any render logic.
-fn flip_rows_vertical(pixels: &mut [u8], width: u32, height: u32) {
-    let stride = width as usize * 4;
-    for row in 0..height as usize / 2 {
-        let opposite = height as usize - 1 - row;
-        let (top, bottom) = pixels.split_at_mut(opposite * stride);
-        top[row * stride..row * stride + stride]
-            .swap_with_slice(&mut bottom[..stride]);
-    }
-}
-
 // ─── Font-based glyph renderer ───────────────────────────────────────────────
 
 fn fill_background(
@@ -287,13 +288,13 @@ fn fill_background(
     cell_py: u32,
     cw: u32,
     ch: u32,
-    bg: &[u8; 4],
+    bg: &[u8; 3],
     total_w: u32,
 ) {
     for py in 0..ch {
         for px in 0..cw {
-            let idx = ((cell_py + py) * total_w + (cell_px + px)) as usize * 4;
-            if let Some(dst) = pixels.get_mut(idx..idx + 4) {
+            let idx = ((cell_py + py) * total_w + (cell_px + px)) as usize * 3;
+            if let Some(dst) = pixels.get_mut(idx..idx + 3) {
                 dst.copy_from_slice(bg);
             }
         }
@@ -309,7 +310,7 @@ fn draw_glyph(
     cell_w: u32,
     cell_h: u32,
     baseline: u32,
-    fg: &[u8; 4],
+    fg: &[u8; 3],
     total_w: u32,
 ) {
     if metrics.width == 0 || metrics.height == 0 {
@@ -338,8 +339,8 @@ fn draw_glyph(
                 continue;
             }
 
-            let idx = (py as u32 * total_w + px as u32) as usize * 4;
-            if idx + 3 >= pixels.len() {
+            let idx = (py as u32 * total_w + px as u32) as usize * 3;
+            if idx + 2 >= pixels.len() {
                 continue;
             }
 
@@ -349,7 +350,6 @@ fn draw_glyph(
             pixels[idx]     = (fg[0] as f32 * alpha + pixels[idx]     as f32 * inv) as u8;
             pixels[idx + 1] = (fg[1] as f32 * alpha + pixels[idx + 1] as f32 * inv) as u8;
             pixels[idx + 2] = (fg[2] as f32 * alpha + pixels[idx + 2] as f32 * inv) as u8;
-            pixels[idx + 3] = 0xFF;
         }
     }
 }

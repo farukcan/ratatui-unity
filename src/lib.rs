@@ -50,11 +50,11 @@ fn style_from_rgba(
 #[no_mangle]
 pub extern "C" fn ratatui_set_background_color(
     handle: *mut c_void,
-    r: u8, g: u8, b: u8, a: u8,
+    r: u8, g: u8, b: u8, _a: u8,
 ) {
     if handle.is_null() { return; }
     let state = unsafe { state_mut(handle) };
-    state.background_color = [r, g, b, a];
+    state.background_color = [r, g, b];
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -96,12 +96,36 @@ pub extern "C" fn ratatui_begin_frame(handle: *mut c_void) {
 }
 
 /// Render all queued commands, rasterize to a pixel buffer, return a pointer to
-/// the RGBA32 data. Valid until the next call on this handle.
+/// the RGB24 data. Valid until the next call on this handle.
 #[no_mangle]
 pub extern "C" fn ratatui_end_frame(handle: *mut c_void) -> *const u8 {
     if handle.is_null() { return std::ptr::null(); }
     let state = unsafe { state_mut(handle) };
     render_all_commands(state);
+    state.rasterize();
+    state.pixel_buffer.as_ptr()
+}
+
+/// Like `ratatui_end_frame`, but skips rasterization when the cell buffer
+/// is unchanged from the previous frame (hash-based dirty check).
+/// Returns a valid pixel pointer when content changed, or null when unchanged.
+/// The previous frame's pixel buffer remains valid when null is returned.
+#[no_mangle]
+pub extern "C" fn ratatui_end_frame_hashed(handle: *mut c_void) -> *const u8 {
+    if handle.is_null() { return std::ptr::null(); }
+    let state = unsafe { state_mut(handle) };
+    render_all_commands(state);
+
+    let hash = {
+        let buffer = state.terminal.backend().buffer();
+        crate::renderer::compute_buffer_hash(buffer)
+    };
+
+    if hash == state.last_buffer_hash {
+        return std::ptr::null();
+    }
+
+    state.last_buffer_hash = hash;
     state.rasterize();
     state.pixel_buffer.as_ptr()
 }

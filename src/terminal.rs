@@ -181,7 +181,7 @@ pub struct TerminalState {
     pub commands: Vec<WidgetCommand>,
     /// Style applied to the next widget command.
     pub pending_style: Style,
-    /// Last computed pixel buffer (RGBA32).
+    /// Last computed pixel buffer (RGB24).
     pub pixel_buffer: Vec<u8>,
     pub pixel_width: u32,
     pub pixel_height: u32,
@@ -189,8 +189,10 @@ pub struct TerminalState {
     pub pending_styled_para: Option<PendingStyledParagraph>,
     pub pending_chart: Option<PendingChart>,
     pub pending_canvas: Option<PendingCanvas>,
-    /// RGBA background color used during rasterization. Defaults to dark navy.
-    pub background_color: [u8; 4],
+    /// RGB background color used during rasterization. Defaults to dark navy.
+    pub background_color: [u8; 3],
+    /// Hash of the ratatui Buffer from the previous frame (for dirty-checking).
+    pub last_buffer_hash: u64,
 }
 
 impl TerminalState {
@@ -212,13 +214,14 @@ impl TerminalState {
             next_area_id: 1,
             commands: Vec::new(),
             pending_style: Style::default(),
-            pixel_buffer: vec![0u8; (pixel_width * pixel_height * 4) as usize],
+            pixel_buffer: vec![0u8; (pixel_width * pixel_height * 3) as usize],
             pixel_width,
             pixel_height,
             pending_styled_para: None,
             pending_chart: None,
             pending_canvas: None,
             background_color: crate::color::DEFAULT_BG,
+            last_buffer_hash: 0,
         }
     }
 

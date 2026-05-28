@@ -85,8 +85,8 @@ namespace RatatuiUnity
 
         /// <summary>
         /// Execute all queued widget commands and return a direct pointer to the
-        /// native RGBA32 pixel buffer.  The pointer is valid until the next
-        /// <see cref="BeginFrame"/> call.  Byte count is <c>PixelWidth * PixelHeight * 4</c>.
+        /// native RGB24 pixel buffer.  The pointer is valid until the next
+        /// <see cref="BeginFrame"/> call.  Byte count is <c>PixelWidth * PixelHeight * 3</c>.
         /// Prefer this over <see cref="EndFrame"/> to avoid a managed byte[] allocation
         /// every frame — pass the pointer directly to
         /// <c>Texture2D.LoadRawTextureData(IntPtr, int)</c>.
@@ -98,7 +98,20 @@ namespace RatatuiUnity
         }
 
         /// <summary>
-        /// Execute all queued widget commands and copy the RGBA32 pixel data into
+        /// Like <see cref="EndFrameRaw"/>, but uses a hash-based dirty check on
+        /// the cell buffer. Returns <see cref="IntPtr.Zero"/> when the buffer
+        /// content is unchanged from the previous frame, allowing the caller to
+        /// skip the GPU texture upload. The previous frame's pixel data remains
+        /// valid and the texture does not need updating.
+        /// </summary>
+        public IntPtr EndFrameRawIfDirty()
+        {
+            ThrowIfDisposed();
+            return RatatuiNative.ratatui_end_frame_hashed(_handle);
+        }
+
+        /// <summary>
+        /// Execute all queued widget commands and copy the RGB24 pixel data into
         /// a newly allocated <c>byte[]</c>.  Prefer <see cref="EndFrameRaw"/> to
         /// avoid a ~1-2 MB GC allocation every frame.
         /// </summary>
@@ -106,7 +119,7 @@ namespace RatatuiUnity
         {
             IntPtr ptr = EndFrameRaw();
             if (ptr == IntPtr.Zero) return Array.Empty<byte>();
-            int byteCount = PixelWidth * PixelHeight * 4;
+            int byteCount = PixelWidth * PixelHeight * 3;
             byte[] pixels = new byte[byteCount];
             Marshal.Copy(ptr, pixels, 0, byteCount);
             return pixels;

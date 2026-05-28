@@ -16,6 +16,15 @@ namespace RatatuiUnity
         private uint _lastAreaId;
         private int _lastAreaX;
 
+        // Cached substrings to avoid per-frame Substring allocations in Render()
+        private string _cachedValueRef;
+        private int _cachedCursor = -1;
+        private int _cachedScroll = -1;
+        private int _cachedWidth = -1;
+        private string _cachedBefore = "";
+        private string _cachedCursorStr = " ";
+        private string _cachedAfter = "";
+
         /// <summary>Current text content. Setting this clamps the cursor.</summary>
         public string Value
         {
@@ -228,40 +237,60 @@ namespace RatatuiUnity
 
             int cursorInView = _cursor - _scrollOffset;
 
-            // Build the styled paragraph
-            var builder = term.BeginStyledParagraph(areaId, Alignment.Left, wrap: false);
+            // Recompute cached substrings only when input state changed
+            bool cacheValid = ReferenceEquals(_value, _cachedValueRef)
+                           && _cursor == _cachedCursor
+                           && _scrollOffset == _cachedScroll
+                           && width == _cachedWidth;
 
-            // Before cursor
-            if (cursorInView > 0 && visibleLen > 0)
+            if (!cacheValid)
             {
-                int beforeLen = Mathf.Min(cursorInView, visibleLen);
-                string before = _value.Substring(visibleStart, beforeLen);
-                builder.Span(before, fg, bg);
-            }
+                _cachedValueRef = _value;
+                _cachedCursor = _cursor;
+                _cachedScroll = _scrollOffset;
+                _cachedWidth = width;
 
-            // Cursor character (inverted)
-            if (_cursor < _value.Length)
-            {
-                builder.Span(_value[_cursor].ToString(), cursorFg, cursorBg);
-            }
-            else
-            {
-                // Cursor at end: show a space block
-                builder.Span(" ", cursorFg, cursorBg);
-            }
-
-            // After cursor
-            int afterStart = _cursor + 1;
-            if (afterStart < _value.Length)
-            {
-                int afterVisibleStart = afterStart;
-                int afterVisibleEnd = Mathf.Min(_value.Length, _scrollOffset + width);
-                if (afterVisibleEnd > afterVisibleStart)
+                // Before cursor
+                if (cursorInView > 0 && visibleLen > 0)
                 {
-                    string after = _value.Substring(afterVisibleStart, afterVisibleEnd - afterVisibleStart);
-                    builder.Span(after, fg, bg);
+                    int beforeLen = Mathf.Min(cursorInView, visibleLen);
+                    _cachedBefore = _value.Substring(visibleStart, beforeLen);
+                }
+                else
+                {
+                    _cachedBefore = null;
+                }
+
+                // Cursor character
+                _cachedCursorStr = _cursor < _value.Length
+                    ? _value[_cursor].ToString()
+                    : " ";
+
+                // After cursor
+                int afterStart = _cursor + 1;
+                if (afterStart < _value.Length)
+                {
+                    int afterVisibleEnd = Mathf.Min(_value.Length, _scrollOffset + width);
+                    _cachedAfter = afterVisibleEnd > afterStart
+                        ? _value.Substring(afterStart, afterVisibleEnd - afterStart)
+                        : null;
+                }
+                else
+                {
+                    _cachedAfter = null;
                 }
             }
+
+            // Build the styled paragraph from cached strings
+            var builder = term.BeginStyledParagraph(areaId, Alignment.Left, wrap: false);
+
+            if (_cachedBefore != null)
+                builder.Span(_cachedBefore, fg, bg);
+
+            builder.Span(_cachedCursorStr, cursorFg, cursorBg);
+
+            if (_cachedAfter != null)
+                builder.Span(_cachedAfter, fg, bg);
 
             builder.Render();
         }

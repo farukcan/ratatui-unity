@@ -35,11 +35,18 @@ namespace RatatuiUnity
         internal static extern void ratatui_begin_frame(IntPtr handle);
 
         /// <summary>
-        /// Renders queued commands and returns a pointer to the RGBA32 pixel buffer.
+        /// Renders queued commands and returns a pointer to the RGB24 pixel buffer.
         /// The pointer is valid until the next call on this handle.
         /// </summary>
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ratatui_end_frame(IntPtr handle);
+
+        /// <summary>
+        /// Like <see cref="ratatui_end_frame"/>, but skips pixel rasterization when the
+        /// cell buffer is unchanged (hash-based dirty check). Returns null when unchanged.
+        /// </summary>
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ratatui_end_frame_hashed(IntPtr handle);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ratatui_set_background_color(

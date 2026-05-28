@@ -64,6 +64,11 @@ namespace RatatuiUnity
         [Tooltip("Scroll wheel sensitivity multiplier. Increase for faster scrolling.")]
         [SerializeField] private float _scrollSensitivity = 1f;
 
+        [Header("Performance")]
+        [Tooltip("Maximum terminal render FPS. 0 = unlimited (renders every Unity frame). " +
+                 "Lower values reduce CPU/GPU cost. Hash-based dirty check still applies.")]
+        [SerializeField] private int _maxRenderFps;
+
         // ── Public Properties ─────────────────────────────────────────────────
 
         /// <summary>The rendered texture. Assign to any Unity material or UI image.</summary>
@@ -88,6 +93,18 @@ namespace RatatuiUnity
         // Accumulates raw scroll delta; fires a discrete event per threshold crossed.
         // This normalizes continuous (trackpad) and discrete (mouse wheel) input.
         private float _scrollAccumulator;
+
+        // Cached Camera.main to avoid per-frame FindGameObjectWithTag overhead
+        private Camera _cachedMainCamera;
+
+        // Render throttle: time since last actual render
+        private float _renderTimer;
+
+        // Raycast cache: skip Physics.Raycast when mouse hasn't moved (3D mesh path)
+        private Vector2 _lastRayScreenPos = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        private int _lastRayCol;
+        private int _lastRayRow;
+        private bool _lastRayValid;
 
         // Key repeat state for held-down special keys
         private KeyCode _heldKey = KeyCode.None;
@@ -123,13 +140,14 @@ namespace RatatuiUnity
             Texture = new Texture2D(
                 Terminal.PixelWidth,
                 Terminal.PixelHeight,
-                TextureFormat.RGBA32,
+                TextureFormat.RGB24,
                 mipChain: false)
             {
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp,
             };
             ApplyTextureTarget();
+            _cachedMainCamera = Camera.main;
             ValidateInputRequirements();
         }
 
@@ -142,13 +160,25 @@ namespace RatatuiUnity
             // Input runs before BuildFrame so state changes are reflected in the same frame
             if (_enableInput) ProcessInput();
 
+            // FPS throttle: skip entire render pipeline when interval hasn't elapsed
+            if (_maxRenderFps > 0)
+            {
+                _renderTimer += Time.unscaledDeltaTime;
+                float interval = 1f / _maxRenderFps;
+                if (_renderTimer < interval)
+                    return;
+                _renderTimer -= interval;
+            }
+
             Terminal.BeginFrame();
             BuildFrame(Terminal);
 
-            IntPtr ptr = Terminal.EndFrameRaw();
+            // Hash-based dirty check: EndFrameRawIfDirty returns null when
+            // the cell buffer is unchanged, skipping pixel rasterization + GPU upload.
+            IntPtr ptr = Terminal.EndFrameRawIfDirty();
             if (ptr != IntPtr.Zero)
             {
-                int byteCount = Terminal.PixelWidth * Terminal.PixelHeight * 4;
+                int byteCount = Terminal.PixelWidth * Terminal.PixelHeight * 3;
                 Texture.LoadRawTextureData(ptr, byteCount);
                 Texture.Apply(updateMipmaps: false);
             }
@@ -159,7 +189,8 @@ namespace RatatuiUnity
             if (_rawImage != null || _meshRenderer != null) return;
             if (Texture == null) return;
 
-            GUI.DrawTexture(_onGuiRect, Texture, ScaleMode.StretchToFill, false);
+            GUI.DrawTextureWithTexCoords(
+                _onGuiRect, Texture, new Rect(0f, 1f, 1f, -1f), false);
         }
 
         protected virtual void OnDestroy()
@@ -199,8 +230,9 @@ namespace RatatuiUnity
 
         private void ProcessInput()
         {
-            if (_enableKeyboardInput) ProcessKeyboard();
-            if (_enableMouseInput) ProcessMouse();
+            var mods = GetCurrentModifiers();
+            if (_enableKeyboardInput) ProcessKeyboard(mods);
+            if (_enableMouseInput) ProcessMouse(mods);
         }
 
         private KeyModifiers GetCurrentModifiers()
@@ -215,10 +247,8 @@ namespace RatatuiUnity
             return mods;
         }
 
-        private void ProcessKeyboard()
+        private void ProcessKeyboard(KeyModifiers mods)
         {
-            var mods = GetCurrentModifiers();
-
             // Character input — skip control chars and macOS function key codes
             foreach (char c in Input.inputString)
             {
@@ -255,9 +285,8 @@ namespace RatatuiUnity
             }
         }
 
-        private void ProcessMouse()
+        private void ProcessMouse(KeyModifiers mods)
         {
-            var mods = GetCurrentModifiers();
             Vector2 screenPos = Input.mousePosition;
 
             if (!TryGetTerminalCell(screenPos, out int col, out int row))
@@ -389,13 +418,30 @@ namespace RatatuiUnity
 
             if (_meshRenderer != null)
             {
-                Camera cam = Camera.main;
-                if (cam == null) return false;
+                // Return cached result when mouse hasn't moved
+                if (screenPos == _lastRayScreenPos)
+                {
+                    col = _lastRayCol;
+                    row = _lastRayRow;
+                    return _lastRayValid;
+                }
+                _lastRayScreenPos = screenPos;
+
+                Camera cam = _cachedMainCamera;
+                if (cam == null)
+                {
+                    _lastRayValid = false;
+                    return false;
+                }
 
                 Ray ray = cam.ScreenPointToRay(screenPos);
-                if (!Physics.Raycast(ray, out RaycastHit hit)) return false;
-                if (hit.collider == null || hit.collider.gameObject != _meshRenderer.gameObject)
+                if (!Physics.Raycast(ray, out RaycastHit hit)
+                    || hit.collider == null
+                    || hit.collider.gameObject != _meshRenderer.gameObject)
+                {
+                    _lastRayValid = false;
                     return false;
+                }
 
                 col = Mathf.Clamp(
                     (int)(hit.textureCoord.x * Terminal.Cols), 0, Terminal.Cols - 1);
@@ -403,6 +449,10 @@ namespace RatatuiUnity
                 row = Mathf.Clamp(
                     Terminal.Rows - 1 - (int)(hit.textureCoord.y * Terminal.Rows),
                     0, Terminal.Rows - 1);
+
+                _lastRayCol = col;
+                _lastRayRow = row;
+                _lastRayValid = true;
                 return true;
             }
 
@@ -454,7 +504,7 @@ namespace RatatuiUnity
                 }
             }
 
-            if (Camera.main == null)
+            if (_cachedMainCamera == null)
             {
                 Debug.LogWarning(
                     "[RatatuiRenderer] Camera.main is null. Ensure a camera is tagged 'MainCamera' " +
@@ -499,15 +549,24 @@ namespace RatatuiUnity
 
         private void ApplyTextureTarget()
         {
+            // Native pixel buffer is top-to-bottom (no vertical flip in Rust).
+            // Each target needs a UV flip to display correctly.
+
             if (_rawImage != null)
             {
                 _rawImage.texture = Texture;
+                _rawImage.uvRect = new Rect(0f, 1f, 1f, -1f);
                 if (!_fitIntoRectTransform)
                     FitRawImageToTexture();
             }
 
             if (_meshRenderer != null && _meshRenderer.material != null)
-                _meshRenderer.material.mainTexture = Texture;
+            {
+                var mat = _meshRenderer.material;
+                mat.mainTexture = Texture;
+                mat.mainTextureScale = new Vector2(1f, -1f);
+                mat.mainTextureOffset = new Vector2(0f, 1f);
+            }
         }
 
         /// <summary>

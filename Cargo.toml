@@ -12,6 +12,7 @@ ratatui = { version = "0.30", default-features = false, features = [
     "widget-calendar",
 ] }
 fontdue = "0.9"
+rustc-hash = "2"
 time = { version = "0.3", default-features = false }
 
 [profile.release]
