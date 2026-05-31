@@ -175,7 +175,11 @@ namespace RatatuiUnity.Samples.Console
             sb.Append(" system · ").Append(FormatBytes(GC.GetTotalMemory(false)));
             sb.Append(" managed");
             sb.Append("\nScreen: ").Append(Screen.width).Append('×').Append(Screen.height);
-            sb.Append('@').Append(Screen.currentResolution.refreshRate).Append("Hz");
+            var refreshRatio = Screen.currentResolution.refreshRateRatio;
+            double hz = refreshRatio.denominator == 0
+                ? 0.0
+                : (double)refreshRatio.numerator / refreshRatio.denominator;
+            sb.Append('@').Append(System.Math.Round(hz, 2)).Append("Hz");
             sb.Append("\nPlatform: ").Append(Application.platform);
             sb.Append(" · ").Append(Application.isMobilePlatform ? "mobile" : "desktop");
             sb.Append(" · ").Append(Application.internetReachability);

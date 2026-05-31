@@ -40,6 +40,8 @@ namespace RatatuiUnity.Demo
         // Mouse hit-testing: area ID and top row of the inbox list (from previous frame)
         private uint _inboxInnerArea;
         private int  _inboxTop;
+        private int  _inboxVisibleRows;
+        private int  _inboxScroll;
         private int  _hoveredEmail = -1;
 
         public EmailTab() { _emails.SelectFirst(); }
@@ -65,7 +67,7 @@ namespace RatatuiUnity.Demo
                 if (e.Type == MouseEventType.Click && e.Button == MouseButton.Left)
                 {
                     int localRow = e.Row - _inboxTop;
-                    _emails.Select(localRow);
+                    _emails.Select(_inboxScroll + localRow);
                 }
                 if (e.Type == MouseEventType.Scroll)
                 {
@@ -78,7 +80,7 @@ namespace RatatuiUnity.Demo
         public void OnHoverChanged(TerminalHoverState oldState, TerminalHoverState newState)
         {
             _hoveredEmail = (newState.IsInside && newState.AreaId == _inboxInnerArea)
-                ? newState.Row - _inboxTop
+                ? _inboxScroll + (newState.Row - _inboxTop)
                 : -1;
         }
 
@@ -99,21 +101,50 @@ namespace RatatuiUnity.Demo
             term.Block(area, "Inbox", Borders.All);
             uint inner = term.Inner(area);
 
-            // Store area info for mouse hit-testing
             _inboxInnerArea = inner;
+            _inboxVisibleRows = 0;
             if (term.TryGetAreaRect(inner, out int ax, out int ay, out int aw, out int ah))
+            {
                 _inboxTop = ay;
+                _inboxVisibleRows = ah;
+            }
 
-            RenderInboxList(term, inner, _emails.Selected, _hoveredEmail);
+            // Keep the selected email inside the visible window before rendering.
+            EnsureSelectedVisible(_inboxVisibleRows);
 
-            term.Scrollbar(area, Emails.Length, System.Math.Max(0, _emails.Selected),
-                viewportLength: 5, orientation: ScrollbarOrientation.VerticalRight);
+            RenderInboxList(term, inner, _emails.Selected, _hoveredEmail,
+                _inboxScroll, _inboxVisibleRows);
+
+            term.Scrollbar(area, Emails.Length, _inboxScroll,
+                viewportLength: System.Math.Max(1, _inboxVisibleRows),
+                orientation: ScrollbarOrientation.VerticalRight);
         }
 
-        private void RenderInboxList(RatatuiTerminal term, uint area, int selected, int hovered)
+        private void EnsureSelectedVisible(int visibleRows)
+        {
+            if (visibleRows <= 0)
+            {
+                _inboxScroll = 0;
+                return;
+            }
+            int sel = _emails.Selected;
+            if (sel >= 0)
+            {
+                if (sel < _inboxScroll) _inboxScroll = sel;
+                else if (sel >= _inboxScroll + visibleRows) _inboxScroll = sel - visibleRows + 1;
+            }
+            int maxScroll = Mathf.Max(0, Emails.Length - visibleRows);
+            _inboxScroll = Mathf.Clamp(_inboxScroll, 0, maxScroll);
+        }
+
+        private void RenderInboxList(RatatuiTerminal term, uint area, int selected, int hovered,
+            int scroll, int visibleRows)
         {
             var b = term.BeginStyledParagraph(area, Alignment.Left, false);
-            for (int i = 0; i < Emails.Length; i++)
+            int end = visibleRows <= 0
+                ? Emails.Length
+                : Mathf.Min(Emails.Length, scroll + visibleRows);
+            for (int i = scroll; i < end; i++)
             {
                 bool isSelected = i == selected;
                 bool isHovered  = i == hovered && !isSelected;

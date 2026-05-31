@@ -305,21 +305,73 @@ namespace RatatuiUnity
         }
 
         /// <summary>
-        /// Render a scrollbar widget.
+        /// Render a scrollbar using "scroll offset" semantics. The thumb reaches the end of the
+        /// track exactly when <paramref name="position"/> equals
+        /// <c>contentLength - viewportLength</c> (i.e. the content is scrolled to its last page).
+        /// When <paramref name="viewportLength"/> is at least as large as
+        /// <paramref name="contentLength"/>, the thumb fills the entire track to indicate that
+        /// everything is already visible and no scrolling is possible.
         /// </summary>
+        /// <remarks>
+        /// Ratatui's underlying scrollbar formula is
+        /// <c>thumb_end / track = (position + viewport) / (contentLength - 1 + viewport)</c>,
+        /// which only saturates when <c>position == contentLength - 1</c>. That corresponds to
+        /// "last item at the top of the viewport" — past the visual end of the list — so a
+        /// real scroll offset (max <c>contentLength - viewportLength</c>) never makes the thumb
+        /// reach the bottom. Substituting <c>contentLength' = contentLength - viewportLength + 1</c>
+        /// reduces the formula to <c>(position + viewport) / contentLength</c> so the thumb
+        /// saturates at the actual end of the scroll range.
+        ///
+        /// Parameters are declared as <see cref="long"/> so callers passing either
+        /// <see cref="int"/> or <see cref="uint"/> counts compile without explicit casts.
+        /// </remarks>
+        /// <param name="areaId">Target area.</param>
+        /// <param name="contentLength">Total number of scrollable items / rows.</param>
+        /// <param name="position">Top visible item index (clamped to <c>0 .. contentLength - viewportLength</c>).</param>
+        /// <param name="viewportLength">Number of items visible at once. Must be &gt;= 1.</param>
+        /// <param name="orientation">Scrollbar placement / direction.</param>
         public void Scrollbar(
             uint areaId,
-            int contentLength,
-            int position,
-            int viewportLength = 0,
+            long contentLength,
+            long position,
+            long viewportLength,
             ScrollbarOrientation orientation = ScrollbarOrientation.VerticalRight)
         {
             ThrowIfDisposed();
+
+            long c = contentLength < 0L ? 0L : contentLength;
+            long p = position < 0L ? 0L : position;
+            long v = viewportLength < 1L ? 1L : viewportLength;
+
+            uint effContent;
+            uint effPos;
+            uint effViewport;
+            if (c == 0L)
+            {
+                effContent = 0u;
+                effPos = 0u;
+                effViewport = 0u;
+            }
+            else if (v >= c)
+            {
+                // All content fits in the viewport — render a single full-track thumb.
+                effContent = 1u;
+                effPos = 0u;
+                effViewport = 1u;
+            }
+            else
+            {
+                long ec = c - v + 1L;
+                long maxOffset = ec - 1L; // == c - v
+                long pos = p > maxOffset ? maxOffset : p;
+                effContent = (uint)ec;
+                effPos = (uint)pos;
+                effViewport = (uint)v;
+            }
+
             RatatuiNative.ratatui_scrollbar(
                 _handle, areaId,
-                (uint)System.Math.Max(0, contentLength),
-                (uint)System.Math.Max(0, position),
-                (uint)System.Math.Max(0, viewportLength),
+                effContent, effPos, effViewport,
                 (byte)orientation);
         }
 

@@ -35,6 +35,8 @@ namespace RatatuiUnity.Demo
         // Mouse hit-testing
         private uint _ingredientInnerArea;
         private int  _ingredientTop;
+        private int  _ingredientVisibleRows;
+        private int  _ingredientScroll;
         private int  _hoveredIngredient = -1;
 
         public void Update(float dt) { }
@@ -58,7 +60,7 @@ namespace RatatuiUnity.Demo
                 if (e.Type == MouseEventType.Click && e.Button == MouseButton.Left)
                 {
                     int localRow = e.Row - _ingredientTop;
-                    _ingredients.Select(localRow);
+                    _ingredients.Select(_ingredientScroll + localRow);
                 }
                 if (e.Type == MouseEventType.Scroll)
                 {
@@ -71,7 +73,7 @@ namespace RatatuiUnity.Demo
         public void OnHoverChanged(TerminalHoverState oldState, TerminalHoverState newState)
         {
             _hoveredIngredient = (newState.IsInside && newState.AreaId == _ingredientInnerArea)
-                ? newState.Row - _ingredientTop
+                ? _ingredientScroll + (newState.Row - _ingredientTop)
                 : -1;
         }
 
@@ -92,22 +94,50 @@ namespace RatatuiUnity.Demo
             term.Block(area, "Ingredients", Borders.All);
             uint inner = term.Inner(area);
 
-            // Store area info for mouse hit-testing
             _ingredientInnerArea = inner;
+            _ingredientVisibleRows = 0;
             if (term.TryGetAreaRect(inner, out int ax, out int ay, out int aw, out int ah))
+            {
                 _ingredientTop = ay;
+                _ingredientVisibleRows = ah;
+            }
 
-            RenderIngredientList(term, inner, _ingredients.Selected, _hoveredIngredient);
+            // Keep the selected ingredient inside the visible window before rendering.
+            EnsureSelectedVisible(_ingredientVisibleRows);
 
-            // Scrollbar on the right edge
-            term.Scrollbar(area, Ingredients.Length, System.Math.Max(0, _ingredients.Selected),
-                viewportLength: 8, orientation: ScrollbarOrientation.VerticalRight);
+            RenderIngredientList(term, inner, _ingredients.Selected, _hoveredIngredient,
+                _ingredientScroll, _ingredientVisibleRows);
+
+            term.Scrollbar(area, Ingredients.Length, _ingredientScroll,
+                viewportLength: System.Math.Max(1, _ingredientVisibleRows),
+                orientation: ScrollbarOrientation.VerticalRight);
         }
 
-        private void RenderIngredientList(RatatuiTerminal term, uint area, int selected, int hovered)
+        private void EnsureSelectedVisible(int visibleRows)
+        {
+            if (visibleRows <= 0)
+            {
+                _ingredientScroll = 0;
+                return;
+            }
+            int sel = _ingredients.Selected;
+            if (sel >= 0)
+            {
+                if (sel < _ingredientScroll) _ingredientScroll = sel;
+                else if (sel >= _ingredientScroll + visibleRows) _ingredientScroll = sel - visibleRows + 1;
+            }
+            int maxScroll = Mathf.Max(0, Ingredients.Length - visibleRows);
+            _ingredientScroll = Mathf.Clamp(_ingredientScroll, 0, maxScroll);
+        }
+
+        private void RenderIngredientList(RatatuiTerminal term, uint area, int selected, int hovered,
+            int scroll, int visibleRows)
         {
             var b = term.BeginStyledParagraph(area, Alignment.Left, false);
-            for (int i = 0; i < Ingredients.Length; i++)
+            int end = visibleRows <= 0
+                ? Ingredients.Length
+                : Mathf.Min(Ingredients.Length, scroll + visibleRows);
+            for (int i = scroll; i < end; i++)
             {
                 bool isSelected = i == selected;
                 bool isHovered  = i == hovered && !isSelected;
