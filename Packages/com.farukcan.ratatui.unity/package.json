@@ -22,6 +22,11 @@
       "displayName": "Basic Usage",
       "description": "Demonstrates block, paragraph, list, gauge, and tab widgets rendered to a RawImage texture.",
       "path": "Samples~/BasicUsage"
+    },
+    {
+      "displayName": "Developer Console",
+      "description": "Half-Life style runtime console with static command registration and Unity log capture. Auto-boots on play, toggle with backquote.",
+      "path": "Samples~/Console"
     }
   ]
 }
