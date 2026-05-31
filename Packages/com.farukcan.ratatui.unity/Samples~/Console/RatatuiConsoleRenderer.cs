@@ -78,6 +78,7 @@ namespace RatatuiUnity.Samples.Console
         private static readonly Color ColorButton = new Color(0.85f, 0.85f, 0.9f);
         private static readonly Color ColorButtonHi = new Color(0.4f, 0.8f, 1.0f);
         private static readonly Color ColorSelectionBg = new Color(0.15f, 0.3f, 0.5f);
+        private static readonly Color ColorHoverBg = new Color(0.12f, 0.2f, 0.32f);
 
         // ── Lifecycle ────────────────────────────────────────────────────────
 
@@ -220,32 +221,36 @@ namespace RatatuiUnity.Samples.Console
             // even when the tab is not selected. Selection is signalled by Bold
             // + a contrasting background — not by color presence/absence.
             bool active = _filter == filter;
-            Color bg = active ? ColorSelectionBg : Color.clear;
-            var mods = active ? Modifier.Bold : Modifier.None;
+            bool hover = IsHovering(area);
+            Color bg = active ? ColorSelectionBg : (hover ? ColorHoverBg : Color.clear);
+            Color fg = hover && !active ? ColorButtonHi : activeColor;
+            var mods = active || hover ? Modifier.Bold : Modifier.None;
             term.BeginStyledParagraph(area, Alignment.Center, false)
-                .Span(label, fg: activeColor, bg: bg, modifiers: mods)
+                .Span(label, fg: fg, bg: bg, modifiers: mods)
                 .Render();
         }
 
         private void DrawSearch(RatatuiTerminal term, uint area)
         {
             bool focused = _focus == InputFocus.Search;
+            bool hover = IsHovering(area);
             string text = _searchBuffer.Length > 0 ? _searchBuffer.ToString() : "";
-            Color hintColor = new Color(0.6f, 0.85f, 1.0f);
+            Color hintColor = hover ? ColorButtonHi : new Color(0.6f, 0.85f, 1.0f);
+            Color bg = hover ? ColorHoverBg : Color.clear;
 
             var sp = term.BeginStyledParagraph(area, Alignment.Left, false)
-                .Span(" (F6) ", fg: hintColor, modifiers: Modifier.Bold);
+                .Span(" (F6) ", fg: hintColor, bg: bg, modifiers: Modifier.Bold);
 
             if (text.Length == 0)
             {
                 sp.Span("SEARCH LOGS...", fg: focused ? ColorPromptText : ColorPromptDim,
-                    modifiers: focused ? Modifier.None : Modifier.Dim);
+                    bg: bg, modifiers: focused ? Modifier.None : Modifier.Dim);
             }
             else
             {
-                sp.Span(text, fg: ColorPromptText);
+                sp.Span(text, fg: ColorPromptText, bg: bg);
             }
-            if (focused) sp.Span("_", fg: ColorPromptText, modifiers: Modifier.Bold);
+            if (focused) sp.Span("_", fg: ColorPromptText, bg: bg, modifiers: Modifier.Bold);
             sp.Render();
         }
 
@@ -304,6 +309,7 @@ namespace RatatuiUnity.Samples.Console
             int viewStart = _logScroll;
             int viewEnd = _logScroll + innerHeight;
             int rowsEmitted = 0;
+            int hoveredVis = GetHoveredLogVisIndex();
 
             var sp = term.BeginStyledParagraph(content, Alignment.Left, false);
 
@@ -318,7 +324,8 @@ namespace RatatuiUnity.Samples.Console
                 if (idx < 0 || idx >= entries.Count) continue;
                 var entry = entries[idx];
                 bool selected = idx == _selectedEntryIndex;
-                Color rowBg = selected ? ColorSelectionBg : Color.clear;
+                bool hover = vis == hoveredVis;
+                Color rowBg = selected ? ColorSelectionBg : (hover ? ColorHoverBg : Color.clear);
                 Color msgColor = KindForeground(entry.Kind);
 
                 string normalized = (entry.Message ?? string.Empty)
@@ -473,7 +480,8 @@ namespace RatatuiUnity.Samples.Console
             bool hover = IsHovering(inner);
             var color = hover ? ColorButtonHi : ColorButton;
             term.BeginStyledParagraph(inner, Alignment.Center, false)
-                .Span(label, fg: color, modifiers: hover ? Modifier.Bold : Modifier.None)
+                .Span(label, fg: color, bg: hover ? ColorHoverBg : Color.clear,
+                    modifiers: hover ? Modifier.Bold : Modifier.None)
                 .Render();
             return inner;
         }
@@ -481,6 +489,38 @@ namespace RatatuiUnity.Samples.Console
         private bool IsHovering(uint areaId)
         {
             return areaId != 0 && HoverState.IsInside && HoverState.AreaId == areaId;
+        }
+
+        private int GetHoveredLogVisIndex()
+        {
+            if (!IsHovering(_logListArea)) return -1;
+            if (!Terminal.TryGetAreaRect(_logListArea, out _, out int areaY, out _, out int areaH))
+                return -1;
+
+            int rel = HoverState.Row - areaY;
+            if (rel < 0 || rel >= areaH) return -1;
+
+            int displayRow = _logScroll + rel;
+            for (int vis = 0; vis < _logRowStarts.Count; vis++)
+            {
+                int start = _logRowStarts[vis];
+                int end = GetLogRowEnd(vis);
+                if (displayRow < start) break;
+                if (displayRow >= start && displayRow < end)
+                    return vis;
+            }
+            return -1;
+        }
+
+        private int GetHoveredSuggestionIndex()
+        {
+            if (!IsHovering(_autocompleteArea)) return -1;
+            if (!Terminal.TryGetAreaRect(_autocompleteArea, out _, out int areaY, out _, out int areaH))
+                return -1;
+
+            int rel = HoverState.Row - areaY;
+            if (rel < 0 || rel >= areaH || rel >= _suggestions.Count) return -1;
+            return rel;
         }
 
         // ── Autocomplete Popup ───────────────────────────────────────────────
@@ -500,14 +540,17 @@ namespace RatatuiUnity.Samples.Console
             uint scroll = cols[1];
             _autocompleteArea = content;
 
+            int hoveredSuggestion = GetHoveredSuggestionIndex();
+
             var sp = term.BeginStyledParagraph(content, Alignment.Left, false);
             for (int i = 0; i < _suggestions.Count; i++)
             {
                 var cmd = _suggestions[i];
                 bool selected = i == _suggestionIndex;
-                Color rowBg = selected ? ColorSelectionBg : Color.clear;
-                Color fg = selected ? ColorButtonHi : ColorPromptText;
-                var mods = selected ? Modifier.Bold : Modifier.None;
+                bool hover = i == hoveredSuggestion;
+                Color rowBg = selected ? ColorSelectionBg : (hover ? ColorHoverBg : Color.clear);
+                Color fg = selected || hover ? ColorButtonHi : ColorPromptText;
+                var mods = selected || hover ? Modifier.Bold : Modifier.None;
 
                 sp.Span(" ", bg: rowBg);
                 sp.Span(cmd.Name, fg: fg, bg: rowBg, modifiers: mods);
@@ -541,12 +584,15 @@ namespace RatatuiUnity.Samples.Console
             _promptArea = inner;
 
             bool focused = _focus == InputFocus.Prompt;
+            bool hover = IsHovering(_promptArea);
             bool cursorOn = focused && ((int)(Time.unscaledTime * 2f) % 2 == 0);
+            Color bg = hover ? ColorHoverBg : Color.clear;
+            Color prefixColor = focused || hover ? ColorButtonHi : ColorPromptDim;
 
             var sp = term.BeginStyledParagraph(inner, Alignment.Left, false)
-                .Span("> ", fg: focused ? ColorButtonHi : ColorPromptDim, modifiers: Modifier.Bold)
-                .Span(_promptBuffer.ToString(), fg: ColorPromptText);
-            if (cursorOn) sp.Span("_", fg: ColorPromptText, modifiers: Modifier.Bold);
+                .Span("> ", fg: prefixColor, bg: bg, modifiers: Modifier.Bold)
+                .Span(_promptBuffer.ToString(), fg: ColorPromptText, bg: bg);
+            if (cursorOn) sp.Span("_", fg: ColorPromptText, bg: bg, modifiers: Modifier.Bold);
             sp.Render();
         }
 
