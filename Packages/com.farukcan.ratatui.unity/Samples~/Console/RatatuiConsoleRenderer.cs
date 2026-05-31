@@ -41,6 +41,9 @@ namespace RatatuiUnity.Samples.Console
         // Log scroll is measured in DISPLAY ROWS (not vis indices), because each
         // log can occupy several rows when its message contains newlines.
         private int _logScroll;
+        private int _lastLogGeneration = -1;
+        private bool _followLogTail = true;
+        private bool _forceLogScrollToBottom;
         // For each entry in _visibleIndices, the display row at which it starts.
         private readonly List<int> _logRowStarts = new List<int>(256);
         private int _logTotalRows;
@@ -118,6 +121,8 @@ namespace RatatuiUnity.Samples.Console
                 // events for one frame so the next BuildFrame can populate it before
                 // ProcessMouse runs against it.
                 _freshOpenFrames = 1;
+                _followLogTail = true;
+                _forceLogScrollToBottom = true;
             }
             else
             {
@@ -183,7 +188,7 @@ namespace RatatuiUnity.Samples.Console
 
         private void BuildHeader(RatatuiTerminal term, uint area)
         {
-            term.Block(area, " UNITY DEVELOPER CONSOLE — [Press ~ to close] ", Borders.All);
+            term.Block(area, " UNITY DEVELOPER CONSOLE ", Borders.All);
             uint inner = term.Inner(area);
 
             uint[] cols = term.Split(inner, Direction.Horizontal,
@@ -284,7 +289,15 @@ namespace RatatuiUnity.Samples.Console
 
             var entries = RatatuiConsole.Logs?.Entries;
             RecomputeLogLayout(entries);
-            ClampLogScroll(_logTotalRows, innerHeight);
+
+            int gen = RatatuiConsole.Logs?.Generation ?? 0;
+            bool logsChanged = gen != _lastLogGeneration;
+            _lastLogGeneration = gen;
+
+            if (_forceLogScrollToBottom || (logsChanged && _followLogTail))
+                ScrollLogToBottom(innerHeight);
+            else
+                ClampLogScroll(_logTotalRows, innerHeight);
 
             if (entries == null) return;
 
@@ -760,6 +773,9 @@ namespace RatatuiUnity.Samples.Console
             else if (e.AreaId == _logListArea)
             {
                 _logScroll = Mathf.Max(0, _logScroll + dir);
+                int maxScroll = Mathf.Max(0, _logTotalRows - GetLogListViewportHeight());
+                _logScroll = Mathf.Min(_logScroll, maxScroll);
+                _followLogTail = _logScroll >= maxScroll;
             }
         }
 
@@ -888,6 +904,7 @@ namespace RatatuiUnity.Samples.Console
                 h = hRect;
             if (firstRow < _logScroll) _logScroll = firstRow;
             else if (lastRow >= _logScroll + h) _logScroll = lastRow - h + 1;
+            _followLogTail = IsLogAtBottom(_logScroll, _logTotalRows, h);
         }
 
         private void CycleFilter(int dir)
@@ -915,6 +932,27 @@ namespace RatatuiUnity.Samples.Console
         {
             _suggestions.Clear();
             _suggestionIndex = 0;
+        }
+
+        private void ScrollLogToBottom(int viewportHeight)
+        {
+            _forceLogScrollToBottom = false;
+            int maxScroll = Mathf.Max(0, _logTotalRows - viewportHeight);
+            _logScroll = maxScroll;
+            _followLogTail = true;
+        }
+
+        private static bool IsLogAtBottom(int scroll, int totalRows, int viewportHeight)
+        {
+            int maxScroll = Mathf.Max(0, totalRows - viewportHeight);
+            return scroll >= maxScroll;
+        }
+
+        private int GetLogListViewportHeight()
+        {
+            if (Terminal != null && Terminal.TryGetAreaRect(_logListArea, out _, out _, out _, out int h) && h > 0)
+                return h;
+            return FallbackBodyInnerHeight();
         }
 
         private void ClampLogScroll(int total, int viewportHeight)
