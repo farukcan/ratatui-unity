@@ -24,6 +24,13 @@ namespace RatatuiUnity.Samples.Console
         private int _freshOpenFrames; // skip mouse input until BuildFrame populates area_map
         private InputFocus _focus = InputFocus.Prompt;
 
+        // Hard-coded touch toggle: 4-finger tap. Tracks peak simultaneous touch
+        // count across an active session; fires on full release so the toggle
+        // happens AFTER the gesture ends — otherwise lingering touches in the
+        // next frame would immediately cancel the open we just performed.
+        private const int TouchToggleFingerCount = 4;
+        private int _touchSessionMaxCount;
+
         private readonly StringBuilder _promptBuffer = new StringBuilder(128);
         private readonly StringBuilder _searchBuffer = new StringBuilder(64);
 
@@ -135,6 +142,21 @@ namespace RatatuiUnity.Samples.Console
         {
             if (Input.GetKeyDown(_config.toggleKey))
                 SetOpen(!_isOpen);
+
+            HandleTouchToggle();
+        }
+
+        private void HandleTouchToggle()
+        {
+            int count = Input.touchCount;
+            if (count > _touchSessionMaxCount) _touchSessionMaxCount = count;
+
+            if (count == 0 && _touchSessionMaxCount > 0)
+            {
+                bool fire = _touchSessionMaxCount >= TouchToggleFingerCount;
+                _touchSessionMaxCount = 0;
+                if (fire) SetOpen(!_isOpen);
+            }
         }
 
         // ── Frame Building ───────────────────────────────────────────────────
@@ -193,11 +215,11 @@ namespace RatatuiUnity.Samples.Console
             uint inner = term.Inner(area);
 
             uint[] cols = term.Split(inner, Direction.Horizontal,
-                Constraint.Length(12),
-                Constraint.Length(13),
+                Constraint.Length(16),
                 Constraint.Length(17),
-                Constraint.Length(15),
+                Constraint.Length(21),
                 Constraint.Length(19),
+                Constraint.Length(23),
                 Constraint.Fill(1));
 
             _tabAllArea = cols[0];
@@ -207,12 +229,33 @@ namespace RatatuiUnity.Samples.Console
             _tabExcArea = cols[4];
             _searchArea = cols[5];
 
-            DrawTab(term, cols[0], "(F1) [ALL]",        Filter.All,        new Color(0.85f, 0.85f, 0.85f));
-            DrawTab(term, cols[1], "(F2) [LOGS]",       Filter.Logs,       new Color(0.45f, 0.85f, 0.9f));
-            DrawTab(term, cols[2], "(F3) [WARNINGS]",   Filter.Warnings,   ColorWarn);
-            DrawTab(term, cols[3], "(F4) [ERRORS]",     Filter.Errors,     ColorError);
-            DrawTab(term, cols[4], "(F5) [EXCEPTIONS]", Filter.Exceptions, ColorException);
+            CountByKind(out int allCount, out int logCount, out int warnCount, out int errCount, out int excCount);
+
+            DrawTab(term, cols[0], $"(F2) [{allCount} ALL]",         Filter.All,        new Color(0.85f, 0.85f, 0.85f));
+            DrawTab(term, cols[1], $"(F3) [{logCount} LOGS]",        Filter.Logs,       new Color(0.45f, 0.85f, 0.9f));
+            DrawTab(term, cols[2], $"(F4) [{warnCount} WARNINGS]",   Filter.Warnings,   ColorWarn);
+            DrawTab(term, cols[3], $"(F5) [{errCount} ERRORS]",      Filter.Errors,     ColorError);
+            DrawTab(term, cols[4], $"(F6) [{excCount} EXCEPTIONS]",  Filter.Exceptions, ColorException);
             DrawSearch(term, cols[5]);
+        }
+
+        private void CountByKind(out int all, out int logs, out int warns, out int errs, out int excs)
+        {
+            all = 0; logs = 0; warns = 0; errs = 0; excs = 0;
+            var entries = RatatuiConsole.Logs?.Entries;
+            if (entries == null) return;
+            all = entries.Count;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                switch (entries[i].Kind)
+                {
+                    case ConsoleLogKind.Log: logs++; break;
+                    case ConsoleLogKind.Warning: warns++; break;
+                    case ConsoleLogKind.Error: errs++; break;
+                    case ConsoleLogKind.Assert: errs++; break;
+                    case ConsoleLogKind.Exception: excs++; break;
+                }
+            }
         }
 
         private void DrawTab(RatatuiTerminal term, uint area, string label, Filter filter, Color activeColor)
@@ -239,7 +282,7 @@ namespace RatatuiUnity.Samples.Console
             Color bg = hover ? ColorHoverBg : Color.clear;
 
             var sp = term.BeginStyledParagraph(area, Alignment.Left, false)
-                .Span(" (F6) ", fg: hintColor, bg: bg, modifiers: Modifier.Bold);
+                .Span(" (F7) ", fg: hintColor, bg: bg, modifiers: Modifier.Bold);
 
             if (text.Length == 0)
             {
@@ -367,11 +410,8 @@ namespace RatatuiUnity.Samples.Console
             }
             sp.Render();
 
-            if (_logTotalRows > 0)
-            {
-                term.Scrollbar(scroll, _logTotalRows, _logScroll, innerHeight,
-                    ScrollbarOrientation.VerticalRight);
-            }
+            term.Scrollbar(scroll, _logTotalRows, _logScroll, innerHeight,
+                ScrollbarOrientation.VerticalRight, autoHide: true);
         }
 
         private void RecomputeLogLayout(IReadOnlyList<ConsoleLogEntry> entries)
@@ -466,11 +506,8 @@ namespace RatatuiUnity.Samples.Console
             }
             sp.Render();
 
-            if (lines.Length > 0)
-            {
-                term.Scrollbar(scroll, lines.Length, _detailScroll, areaHeight,
-                    ScrollbarOrientation.VerticalRight);
-            }
+            term.Scrollbar(scroll, lines.Length, _detailScroll, areaHeight,
+                ScrollbarOrientation.VerticalRight, autoHide: true);
         }
 
         private uint DrawButton(RatatuiTerminal term, uint area, string label)
@@ -565,12 +602,9 @@ namespace RatatuiUnity.Samples.Console
             }
             sp.Render();
 
-            if (_suggestions.Count > 0)
-            {
-                term.Scrollbar(scroll, _suggestions.Count, _suggestionIndex,
-                    Mathf.Min(_suggestions.Count, popupHeight - 2),
-                    ScrollbarOrientation.VerticalRight);
-            }
+            term.Scrollbar(scroll, _suggestions.Count, _suggestionIndex,
+                Mathf.Min(_suggestions.Count, popupHeight - 2),
+                ScrollbarOrientation.VerticalRight, autoHide: true);
         }
 
         // ── Prompt ───────────────────────────────────────────────────────────
@@ -578,7 +612,7 @@ namespace RatatuiUnity.Samples.Console
         private void BuildPrompt(RatatuiTerminal term, uint area)
         {
             term.Block(area,
-                " Tab=complete · ↑↓=history · F1-F5=filter · F6=search · Enter=run · Esc=close ",
+                " Tab=complete · ↑↓=history · F2-F6=filter · F7=search · Enter=run · Esc=close ",
                 Borders.All);
             uint inner = term.Inner(area);
             _promptArea = inner;
@@ -686,12 +720,12 @@ namespace RatatuiUnity.Samples.Console
             // Function-key shortcuts work regardless of focus.
             switch (e.Key)
             {
-                case KeyCode.F1: _filter = Filter.All;        _logScroll = 0; return;
-                case KeyCode.F2: _filter = Filter.Logs;       _logScroll = 0; return;
-                case KeyCode.F3: _filter = Filter.Warnings;   _logScroll = 0; return;
-                case KeyCode.F4: _filter = Filter.Errors;     _logScroll = 0; return;
-                case KeyCode.F5: _filter = Filter.Exceptions; _logScroll = 0; return;
-                case KeyCode.F6:
+                case KeyCode.F2: _filter = Filter.All;        _logScroll = 0; return;
+                case KeyCode.F3: _filter = Filter.Logs;       _logScroll = 0; return;
+                case KeyCode.F4: _filter = Filter.Warnings;   _logScroll = 0; return;
+                case KeyCode.F5: _filter = Filter.Errors;     _logScroll = 0; return;
+                case KeyCode.F6: _filter = Filter.Exceptions; _logScroll = 0; return;
+                case KeyCode.F7:
                     _focus = _focus == InputFocus.Search ? InputFocus.Prompt : InputFocus.Search;
                     return;
             }

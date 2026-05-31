@@ -337,6 +337,33 @@ namespace RatatuiUnity
             long viewportLength,
             ScrollbarOrientation orientation = ScrollbarOrientation.VerticalRight)
         {
+            ScrollbarCore(areaId, contentLength, position, viewportLength, orientation);
+        }
+
+        /// <summary>
+        /// Same as <see cref="Scrollbar(uint, long, long, long, ScrollbarOrientation)"/>, but
+        /// skips rendering when <paramref name="autoHide"/> is <c>true</c> and the content fits
+        /// the viewport (<c>contentLength &lt;= viewportLength</c>) — i.e. nothing to scroll.
+        /// </summary>
+        public void Scrollbar(
+            uint areaId,
+            long contentLength,
+            long position,
+            long viewportLength,
+            ScrollbarOrientation orientation,
+            bool autoHide)
+        {
+            if (autoHide && contentLength <= viewportLength) return;
+            ScrollbarCore(areaId, contentLength, position, viewportLength, orientation);
+        }
+
+        private void ScrollbarCore(
+            uint areaId,
+            long contentLength,
+            long position,
+            long viewportLength,
+            ScrollbarOrientation orientation)
+        {
             ThrowIfDisposed();
 
             long c = contentLength < 0L ? 0L : contentLength;

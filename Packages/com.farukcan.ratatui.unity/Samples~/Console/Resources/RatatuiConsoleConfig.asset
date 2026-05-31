@@ -19,7 +19,7 @@ MonoBehaviour:
   horizontalAlign: 1
   verticalAlign: 1
   backgroundColor: {r: 0.013043475, g: 0, b: 0.05, a: 1}
-  toggleKey: 45
+  toggleKey: 282
   maxLogEntries: 2000
   maxHistoryEntries: 64
   showTimestamp: 1
