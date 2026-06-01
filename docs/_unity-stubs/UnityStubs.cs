@@ -8,7 +8,29 @@ using System;
 
 namespace UnityEngine
 {
-    public class Object { }
+    public enum HideFlags
+    {
+        None = 0,
+        HideInHierarchy = 1,
+        HideInInspector = 2,
+        DontSaveInEditor = 4,
+        NotEditable = 8,
+        DontSaveInBuild = 16,
+        DontUnloadUnusedAsset = 32,
+        DontSave = DontSaveInEditor | DontSaveInBuild | DontUnloadUnusedAsset,
+        HideAndDontSave = HideInHierarchy | HideInInspector | DontSaveInEditor | DontSaveInBuild | DontUnloadUnusedAsset
+    }
+
+    public class Object
+    {
+        public HideFlags hideFlags { get; set; }
+        public static void Destroy(Object obj) { }
+    }
+
+    public class Component : Object
+    {
+        public GameObject gameObject { get; }
+    }
 
     public class GameObject : Object
     {
@@ -36,6 +58,31 @@ namespace UnityEngine
         public float y;
         public Vector2(float x, float y) { this.x = x; this.y = y; }
         public static Vector2 zero => default;
+        public static Vector2 operator +(Vector2 a, Vector2 b) => new Vector2(a.x + b.x, a.y + b.y);
+        public static Vector2 operator -(Vector2 a, Vector2 b) => new Vector2(a.x - b.x, a.y - b.y);
+        public static bool operator ==(Vector2 lhs, Vector2 rhs) => lhs.x == rhs.x && lhs.y == rhs.y;
+        public static bool operator !=(Vector2 lhs, Vector2 rhs) => !(lhs == rhs);
+        public override bool Equals(object obj) => obj is Vector2 other && this == other;
+        public override int GetHashCode() => x.GetHashCode() ^ y.GetHashCode();
+    }
+
+    public struct Vector3
+    {
+        public float x, y, z;
+        public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+    }
+
+    public struct Ray
+    {
+        public Vector3 origin;
+        public Vector3 direction;
+        public Ray(Vector3 origin, Vector3 direction) { this.origin = origin; this.direction = direction; }
+    }
+
+    public struct RaycastHit
+    {
+        public Collider collider;
+        public Vector2 textureCoord;
     }
 
     public struct Color
@@ -63,6 +110,16 @@ namespace UnityEngine
     public struct Rect
     {
         public float x, y, width, height;
+        public Vector2 position { get; set; }
+        public Rect(float x, float y, float width, float height)
+        {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            position = new Vector2(x, y);
+        }
+        public bool Contains(Vector2 point) => false;
     }
 
     public struct Resolution
@@ -80,11 +137,14 @@ namespace UnityEngine
 
     public enum FilterMode { Point = 0, Bilinear = 1, Trilinear = 2 }
 
+    public enum TextureWrapMode { Repeat = 0, Clamp = 1, Mirror = 2, MirrorOnce = 3 }
+
     public class Texture : Object
     {
         public int width { get; }
         public int height { get; }
         public FilterMode filterMode { get; set; }
+        public TextureWrapMode wrapMode { get; set; }
     }
 
     public class Texture2D : Texture
@@ -98,12 +158,15 @@ namespace UnityEngine
         public void Apply(bool updateMipmaps) { }
         public void Apply(bool updateMipmaps, bool makeNoLongerReadable) { }
         public void SetPixels(Color[] colors) { }
+        public void SetPixel(int x, int y, Color color) { }
         public byte[] GetRawTextureData() => Array.Empty<byte>();
     }
 
     public class Material : Object
     {
         public Texture mainTexture { get; set; }
+        public Vector2 mainTextureScale { get; set; }
+        public Vector2 mainTextureOffset { get; set; }
     }
 
     public class Renderer : MonoBehaviour
@@ -115,16 +178,109 @@ namespace UnityEngine
     public class RectTransform : Transform
     {
         public Rect rect { get; }
+        public Vector2 sizeDelta { get; set; }
     }
 
-    public class Camera : MonoBehaviour
+    public enum RenderMode
     {
-        public static Camera main { get; }
+        ScreenSpaceOverlay,
+        ScreenSpaceCamera,
+        WorldSpace
     }
 
     public class Canvas : MonoBehaviour
     {
         public static void ForceUpdateCanvases() { }
+        public RenderMode renderMode { get; }
+        public Camera worldCamera { get; }
+    }
+
+    public static class RectTransformUtility
+    {
+        public static bool ScreenPointToLocalPointInRectangle(
+            RectTransform rect, Vector2 screenPoint, Camera cam, out Vector2 localPoint)
+        {
+            localPoint = default;
+            return false;
+        }
+    }
+
+    public enum TextAnchor
+    {
+        UpperLeft, UpperCenter, UpperRight,
+        MiddleLeft, MiddleCenter, MiddleRight,
+        LowerLeft, LowerCenter, LowerRight
+    }
+
+    public enum TextClipping { Overflow, Clip }
+
+    public enum ScaleMode
+    {
+        StretchToFill, ScaleAndCrop, ScaleToFit
+    }
+
+    public class GUIStyleState
+    {
+        public Color textColor { get; set; }
+    }
+
+    public class GUIStyle
+    {
+        public GUIStyle() { }
+        public GUIStyle(GUIStyle other) { }
+        public TextAnchor alignment { get; set; }
+        public int fontSize { get; set; }
+        public TextClipping clipping { get; set; }
+        public bool wordWrap { get; set; }
+        public GUIStyleState normal { get; } = new GUIStyleState();
+    }
+
+    public class GUISkin
+    {
+        public GUIStyle label { get; } = new GUIStyle();
+    }
+
+    public class Event
+    {
+        public static Event current { get; } = new Event();
+        public EventType type { get; set; }
+        public int button { get; set; }
+        public Vector2 mousePosition { get; set; }
+        public void Use() { }
+    }
+
+    public enum EventType
+    {
+        MouseDown, MouseUp, MouseDrag, MouseMove, KeyDown, KeyUp, Repaint, Layout
+    }
+
+    public static class GUI
+    {
+        public static Color color { get; set; }
+        public static GUISkin skin { get; } = new GUISkin();
+        public static void DrawTexture(Rect position, Texture image) { }
+        public static void DrawTexture(Rect position, Texture image, ScaleMode scaleMode, bool alphaBlend) { }
+        public static void DrawTextureWithTexCoords(Rect position, Texture image, Rect texCoords, bool alphaBlend) { }
+        public static void Label(Rect position, string text, GUIStyle style) { }
+    }
+
+    public class Collider : Component { }
+
+    public class MeshCollider : Collider
+    {
+        public bool convex { get; set; }
+    }
+
+    public static class Physics
+    {
+        public static bool Raycast(Ray ray, out RaycastHit hit) { hit = default; return false; }
+    }
+
+    public class Camera : MonoBehaviour
+    {
+        public static Camera main { get; }
+        public Ray ScreenPointToRay(Vector3 position) => default;
+        public Ray ScreenPointToRay(Vector2 position) => default;
     }
 
     public static class Mathf
@@ -142,6 +298,7 @@ namespace UnityEngine
         public static float Min(float a, float b) => 0;
         public static int Min(int a, int b) => 0;
         public static float Sign(float v) => 0;
+        public static float Sqrt(float v) => 0;
     }
 
     public static class Time
@@ -158,6 +315,7 @@ namespace UnityEngine
     {
         public static void Log(object message) { }
         public static void LogWarning(object message) { }
+        public static void LogWarning(object message, Object context) { }
         public static void LogError(object message) { }
         public static void LogException(Exception e) { }
     }
@@ -290,6 +448,9 @@ namespace UnityEngine.UI
     public class RawImage : MonoBehaviour
     {
         public Texture texture { get; set; }
+        public RectTransform rectTransform { get; }
+        public Rect uvRect { get; set; }
+        public Canvas canvas { get; }
     }
 }
 
