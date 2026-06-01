@@ -2,5 +2,19 @@
   href: getting-started.md
 - name: Architecture
   href: architecture.md
+- name: Layout
+  href: layout.md
+- name: Widgets — Examples
+  href: widget-examples.md
+- name: Input Handling
+  href: input-handling.md
+- name: Samples
+  items:
+    - name: Overview
+      href: samples-overview.md
+    - name: BasicUsage (Tabs Demo)
+      href: samples-basic-usage.md
+    - name: Developer Console
+      href: samples-console.md
 - name: Rust Contributor Guide
   href: rust-contributor.md
