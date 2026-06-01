@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
@@ -66,6 +67,7 @@ namespace RatatuiUnity.Samples.Console
         private uint _detailPanelArea;
         private uint _detailStackArea;
         private uint _detailCopyArea;
+        private uint _detailEmailArea;
         private uint _detailCloseArea;
         private uint _autocompleteArea;
         private uint _promptArea;
@@ -314,6 +316,7 @@ namespace RatatuiUnity.Samples.Console
                 _detailPanelArea = 0;
                 _detailStackArea = 0;
                 _detailCopyArea = 0;
+                _detailEmailArea = 0;
                 _detailCloseArea = 0;
                 BuildLogList(term, area);
             }
@@ -468,11 +471,13 @@ namespace RatatuiUnity.Samples.Console
             BuildStackTrace(term, rows[2], entry);
 
             uint[] btnCols = term.Split(rows[3], Direction.Horizontal,
-                Constraint.Percentage(50),
-                Constraint.Percentage(50));
+                Constraint.Fill(1),
+                Constraint.Fill(1),
+                Constraint.Fill(1));
 
-            _detailCopyArea = DrawButton(term, btnCols[0], "[ COPY STACKTRACE ]");
-            _detailCloseArea = DrawButton(term, btnCols[1], "[  CLOSE DETAILS  ]");
+            _detailCopyArea = DrawButton(term, btnCols[0], "[ COPY ]");
+            _detailEmailArea = DrawButton(term, btnCols[1], "[ EMAIL ]");
+            _detailCloseArea = DrawButton(term, btnCols[2], "[ CLOSE ]");
         }
 
         private void BuildStackTrace(RatatuiTerminal term, uint area, ConsoleLogEntry entry)
@@ -496,9 +501,9 @@ namespace RatatuiUnity.Samples.Console
             string[] lines = stack.Replace("\r", "").Split('\n');
             ClampDetailScroll(lines.Length, areaHeight);
 
-            var sp = term.BeginStyledParagraph(content, Alignment.Left, false);
+            var sp = term.BeginStyledParagraph(content, Alignment.Left, true);
             int start = _detailScroll;
-            int end = Mathf.Min(lines.Length, start + areaHeight);
+            int end = lines.Length;
             for (int i = start; i < end; i++)
             {
                 sp.Span(lines[i], fg: ColorPromptText, modifiers: Modifier.Dim);
@@ -823,6 +828,7 @@ namespace RatatuiUnity.Samples.Console
             if (a == _searchArea) { _focus = InputFocus.Search; return; }
 
             if (a == _detailCopyArea) { CopySelectedStackTrace(); return; }
+            if (a == _detailEmailArea) { EmailSelectedLog(); return; }
             if (a == _detailCloseArea) { _detailOpen = false; return; }
 
             if (a == _logListArea)
@@ -1005,7 +1011,29 @@ namespace RatatuiUnity.Samples.Console
                 ? entry.Message
                 : entry.Message + "\n\n" + entry.StackTrace;
             GUIUtility.systemCopyBuffer = payload;
-            Debug.Log("[RatatuiConsole] Stack trace copied to clipboard.");
+            Debug.Log("[RatatuiConsole] Log copied to clipboard.");
+        }
+
+        private void EmailSelectedLog()
+        {
+            var entries = RatatuiConsole.Logs?.Entries;
+            if (entries == null) return;
+            if (_selectedEntryIndex < 0 || _selectedEntryIndex >= entries.Count) return;
+            var entry = entries[_selectedEntryIndex];
+
+            string body = string.IsNullOrEmpty(entry.StackTrace)
+                ? entry.Message
+                : entry.Message + "\n\n" + entry.StackTrace;
+
+            string firstLine = entry.Message ?? string.Empty;
+            int nl = firstLine.IndexOf('\n');
+            if (nl >= 0) firstLine = firstLine.Substring(0, nl);
+            if (firstLine.Length > 120) firstLine = firstLine.Substring(0, 120);
+
+            string subject = "[" + Application.productName + "] " + KindTag(entry.Kind) + " " + firstLine;
+            string url = "mailto:?subject=" + Uri.EscapeDataString(subject)
+                       + "&body=" + Uri.EscapeDataString(body);
+            Application.OpenURL(url);
         }
 
         private void ClearSuggestions()
