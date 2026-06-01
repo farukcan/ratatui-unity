@@ -1,3 +1,40 @@
+//! # ratatui_unity
+//!
+//! A C ABI wrapper around [`ratatui`] that renders terminal UIs to RGB24
+//! pixel buffers, suitable for embedding in game engines (e.g. Unity).
+//!
+//! The crate is compiled as both `cdylib` and `staticlib` so that it can be
+//! consumed from any host capable of calling C functions. All public entry
+//! points are `extern "C"` and `#[no_mangle]`; there is no idiomatic Rust API.
+//!
+//! ## High-level flow
+//!
+//! 1. Create a terminal handle with [`ratatui_create`].
+//! 2. For each frame:
+//!    - Call [`ratatui_begin_frame`] to reset per-frame state.
+//!    - Build a layout tree with [`ratatui_split`] / [`ratatui_inner`].
+//!    - Optionally set a style with [`ratatui_set_style`] before any widget call.
+//!    - Queue widget commands (e.g. [`ratatui_block`], [`ratatui_paragraph`],
+//!      [`ratatui_chart_begin`] / [`ratatui_chart_end`], …).
+//!    - Call [`ratatui_end_frame`] (or [`ratatui_end_frame_hashed`]) to draw
+//!      the queue and rasterize the cell grid into an RGB24 pixel buffer.
+//! 3. When done, call [`ratatui_destroy`] to release the handle.
+//!
+//! ## Memory & lifetime
+//!
+//! The handle returned by [`ratatui_create`] is an opaque pointer to a
+//! heap-allocated `TerminalState`. The pixel
+//! buffer pointer returned by `ratatui_end_frame*` is owned by the handle and
+//! is only valid until the next FFI call that mutates the handle. The caller
+//! must copy the bytes before issuing further calls if it wants to retain them.
+//!
+//! ## Safety
+//!
+//! All FFI entry points perform null-pointer checks on the handle and on any
+//! pointer argument they dereference. Strings are read as null-terminated
+//! `*const c_char`. Slices passed as `(ptr, len)` pairs must reference valid
+//! memory for the duration of the call.
+
 mod color;
 mod commands;
 mod font;
@@ -15,10 +52,26 @@ use std::os::raw::c_char;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/// Reinterprets an opaque handle as a mutable reference to [`TerminalState`].
+///
+/// # Safety
+///
+/// `handle` must be a non-null pointer previously returned by
+/// [`ratatui_create`] and not yet passed to [`ratatui_destroy`]. The borrow's
+/// lifetime is unbounded; callers must ensure no other reference to the same
+/// state is active for the duration of the returned borrow.
 unsafe fn state_mut<'a>(handle: *mut c_void) -> &'a mut TerminalState {
     &mut *(handle as *mut TerminalState)
 }
 
+/// Copies a nullable null-terminated C string into an owned [`String`].
+///
+/// Returns an empty `String` when `ptr` is null. Invalid UTF-8 is replaced
+/// using [`String::from_utf8_lossy`].
+///
+/// # Safety
+///
+/// `ptr`, if non-null, must point to a valid null-terminated byte sequence.
 unsafe fn cstr_to_string(ptr: *const c_char) -> String {
     if ptr.is_null() {
         return String::new();
@@ -26,6 +79,17 @@ unsafe fn cstr_to_string(ptr: *const c_char) -> String {
     CStr::from_ptr(ptr).to_string_lossy().into_owned()
 }
 
+/// Builds a ratatui [`Style`] from the packed FFI representation.
+///
+/// `use_default_fg` / `use_default_bg`: non-zero means "leave foreground /
+/// background unset so the terminal default is used"; zero means apply the
+/// given RGB triple.
+///
+/// `modifiers` is a bit field:
+/// - `0x01` Bold
+/// - `0x02` Italic
+/// - `0x04` Underlined
+/// - `0x08` Dim
 fn style_from_rgba(
     fg_r: u8, fg_g: u8, fg_b: u8, use_default_fg: u8,
     bg_r: u8, bg_g: u8, bg_b: u8, use_default_bg: u8,
@@ -45,8 +109,12 @@ fn style_from_rgba(
 
 // ─── Background color ─────────────────────────────────────────────────────────
 
-/// Set the terminal background color (RGB).
-/// Must be called before `ratatui_begin_frame` for the change to take effect.
+/// Sets the RGB background color used by the rasterizer for cells whose
+/// background is [`Color::Reset`].
+///
+/// The value persists across frames until changed again. Setting this between
+/// frames is supported; setting it mid-frame only affects subsequent calls
+/// to `ratatui_end_frame*`.
 #[no_mangle]
 pub extern "C" fn ratatui_set_background_color(
     handle: *mut c_void,
@@ -59,14 +127,30 @@ pub extern "C" fn ratatui_set_background_color(
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
-/// Create a terminal instance and return an opaque handle.
+/// Creates a terminal instance and returns an opaque handle.
+///
+/// The resulting handle owns:
+/// - a ratatui [`Terminal`](ratatui::Terminal) backed by [`TestBackend`](ratatui::backend::TestBackend)
+///   sized `cols × rows` cells,
+/// - a glyph-cached `FontManager` at `font_size` pixels,
+/// - a pre-allocated RGB24 pixel buffer matching `cols × rows × cell_size`.
+///
+/// The handle must eventually be released with [`ratatui_destroy`].
+///
+/// # Parameters
+/// - `cols`: terminal width in character cells.
+/// - `rows`: terminal height in character cells.
+/// - `font_size`: glyph rasterization size in pixels (e.g. `14.0`).
 #[no_mangle]
 pub extern "C" fn ratatui_create(cols: u16, rows: u16, font_size: f32) -> *mut c_void {
     let state = Box::new(TerminalState::new(cols, rows, font_size));
     Box::into_raw(state) as *mut c_void
 }
 
-/// Destroy a terminal handle created by `ratatui_create`.
+/// Destroys a terminal handle created by [`ratatui_create`].
+///
+/// After this call the handle and any previously returned pixel-buffer
+/// pointers are invalid and must not be used. A null handle is a no-op.
 #[no_mangle]
 pub extern "C" fn ratatui_destroy(handle: *mut c_void) {
     if !handle.is_null() {
@@ -74,7 +158,16 @@ pub extern "C" fn ratatui_destroy(handle: *mut c_void) {
     }
 }
 
-/// Replace the embedded font with custom TTF bytes. Returns 1 on success, 0 on error.
+/// Replaces the embedded JetBrains Mono font with custom TTF bytes.
+///
+/// The cell width/height are recomputed from the new font's metrics, and the
+/// glyph cache is dropped. The pixel buffer is not resized here; callers that
+/// rely on a specific pixel size should re-create the handle if the new font
+/// changes cell dimensions.
+///
+/// # Returns
+/// `1` on success, `0` if `handle` is null, `font_data` is null/empty, or the
+/// bytes are not a valid font.
 #[no_mangle]
 pub extern "C" fn ratatui_set_custom_font(
     handle: *mut c_void,
@@ -89,14 +182,26 @@ pub extern "C" fn ratatui_set_custom_font(
 
 // ─── Frame ───────────────────────────────────────────────────────────────────
 
+/// Begins a new frame.
+///
+/// Clears the queued widget command list, drops any in-progress builder state
+/// (styled paragraph, chart, canvas), resets the pending style to default, and
+/// resets the area map so that only the root area (id `0`) remains. Must be
+/// called before issuing widget commands for the new frame.
 #[no_mangle]
 pub extern "C" fn ratatui_begin_frame(handle: *mut c_void) {
     if handle.is_null() { return; }
     unsafe { state_mut(handle) }.begin_frame();
 }
 
-/// Render all queued commands, rasterize to a pixel buffer, return a pointer to
-/// the RGB24 data. Valid until the next call on this handle.
+/// Renders all queued widget commands and rasterizes the cell buffer.
+///
+/// The returned pointer addresses a flat RGB24 buffer of size
+/// `pixel_width * pixel_height * 3` bytes, owned by the handle. The pointer is
+/// valid until the next FFI call that mutates the handle (typically the next
+/// `ratatui_end_frame*` call), at which point the buffer may be overwritten.
+///
+/// Returns `null` only when `handle` is null.
 #[no_mangle]
 pub extern "C" fn ratatui_end_frame(handle: *mut c_void) -> *const u8 {
     if handle.is_null() { return std::ptr::null(); }
@@ -130,12 +235,18 @@ pub extern "C" fn ratatui_end_frame_hashed(handle: *mut c_void) -> *const u8 {
     state.pixel_buffer.as_ptr()
 }
 
+/// Returns the width of the pixel buffer in pixels (`cols * cell_width`).
+///
+/// Returns `0` if `handle` is null.
 #[no_mangle]
 pub extern "C" fn ratatui_pixel_width(handle: *const c_void) -> u32 {
     if handle.is_null() { return 0; }
     unsafe { &*(handle as *const TerminalState) }.pixel_width
 }
 
+/// Returns the height of the pixel buffer in pixels (`rows * cell_height`).
+///
+/// Returns `0` if `handle` is null.
 #[no_mangle]
 pub extern "C" fn ratatui_pixel_height(handle: *const c_void) -> u32 {
     if handle.is_null() { return 0; }
@@ -144,11 +255,33 @@ pub extern "C" fn ratatui_pixel_height(handle: *const c_void) -> u32 {
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
+/// Returns the id of the root area, which always covers the whole terminal.
+///
+/// The root id is the constant `0`; this getter exists for symmetry with the
+/// host-side area API.
 #[no_mangle]
 pub extern "C" fn ratatui_root_area(_handle: *const c_void) -> u32 { 0 }
 
-/// Split `area_id` and write the resulting child IDs into `out_ids`.
-/// `constraint_types`: 0=Length, 1=Min, 2=Max, 3=Percentage, 4=Fill
+/// Splits an existing area into `count` child areas and writes their ids into
+/// `out_ids`.
+///
+/// # Parameters
+/// - `area_id`: id of the parent area to split.
+/// - `direction`: `0` = horizontal split (left → right), any other value =
+///   vertical split (top → bottom).
+/// - `constraint_types`: array of length `count` describing each child's
+///   constraint kind. Values: `0` = Length, `1` = Min, `2` = Max,
+///   `3` = Percentage, `4` (or any other) = Fill.
+/// - `constraint_values`: array of length `count` with the numeric value
+///   matching the constraint kind (cells for Length/Min/Max, 0..=100 for
+///   Percentage, weight for Fill).
+/// - `count`: number of child areas requested.
+/// - `out_ids`: caller-allocated buffer of length `count` that receives the
+///   ids of the newly registered child areas.
+///
+/// # Returns
+/// The number of child areas actually written. Returns `0` if any required
+/// pointer is null, `count` is zero, or the parent id is unknown.
 #[no_mangle]
 pub extern "C" fn ratatui_split(
     handle: *mut c_void,
@@ -174,8 +307,17 @@ pub extern "C" fn ratatui_split(
     do_split(state, area_id, direction, types, values, out)
 }
 
-/// Returns a new area ID inside `area_id` shrunk by the given margin.
-/// Returns `u32::MAX` on error.
+/// Returns a new area id covering the inner rectangle of `area_id` shrunk by
+/// the given margins on each side.
+///
+/// # Parameters
+/// - `area_id`: parent area id.
+/// - `horizontal`: cells to remove from the left and right edges.
+/// - `vertical`: cells to remove from the top and bottom edges.
+///
+/// # Returns
+/// The id of the newly registered inner area, or [`u32::MAX`] if `handle` is
+/// null or `area_id` is unknown.
 #[no_mangle]
 pub extern "C" fn ratatui_inner(
     handle: *mut c_void,
@@ -196,9 +338,21 @@ pub extern "C" fn ratatui_inner(
 
 // ─── Style ───────────────────────────────────────────────────────────────────
 
-/// Set a pending style for the next widget command.
-/// Pass use_default_fg/bg = 1 to use terminal defaults; 0 to use the RGB values.
-/// `modifiers`: 0x01=Bold, 0x02=Italic, 0x04=Underlined, 0x08=Dim
+/// Sets the pending style consumed by the next widget-producing FFI call.
+///
+/// The pending style is reset to default after each widget call and at the
+/// start of every frame. Widgets that do not accept a style (e.g. scrollbar,
+/// calendar, chart, canvas) ignore the pending style.
+///
+/// # Parameters
+/// - `fg_r`, `fg_g`, `fg_b`: foreground RGB components.
+/// - `use_default_fg`: non-zero to leave the foreground unset (terminal
+///   default); zero to apply the given RGB triple.
+/// - `bg_r`, `bg_g`, `bg_b`: background RGB components.
+/// - `use_default_bg`: non-zero to leave the background unset; zero to apply
+///   the given RGB triple.
+/// - `modifiers`: bit field — `0x01` Bold, `0x02` Italic, `0x04` Underlined,
+///   `0x08` Dim.
 #[no_mangle]
 pub extern "C" fn ratatui_set_style(
     handle: *mut c_void,
@@ -217,7 +371,14 @@ pub extern "C" fn ratatui_set_style(
 
 // ─── Basic widgets ────────────────────────────────────────────────────────────
 
-/// `borders`: 0x01=Top, 0x02=Bottom, 0x04=Left, 0x08=Right, 0x0F=All
+/// Queues a [`Block`](ratatui::widgets::Block) widget with an optional title
+/// and per-edge borders.
+///
+/// `borders` is a bit field — `0x01` Top, `0x02` Bottom, `0x04` Left,
+/// `0x08` Right. The value `0x0F` is treated as "all borders".
+///
+/// The pending style (see [`ratatui_set_style`]) is consumed and applied to
+/// the block.
 #[no_mangle]
 pub extern "C" fn ratatui_block(
     handle: *mut c_void,
@@ -236,7 +397,16 @@ pub extern "C" fn ratatui_block(
     });
 }
 
-/// `alignment`: 0=Left, 1=Center, 2=Right
+/// Queues a uniformly styled [`Paragraph`](ratatui::widgets::Paragraph).
+///
+/// # Parameters
+/// - `text`: paragraph contents. Embedded `\n` produces line breaks.
+/// - `alignment`: `0` Left, `1` Center, `2` Right.
+/// - `wrap`: non-zero to enable word wrapping (`trim: false`).
+///
+/// For multi-style text use the styled-paragraph builder
+/// ([`ratatui_styled_para_begin`] / [`ratatui_styled_para_span`] /
+/// [`ratatui_styled_para_newline`] / [`ratatui_styled_para_end`]).
 #[no_mangle]
 pub extern "C" fn ratatui_paragraph(
     handle: *mut c_void,
@@ -257,7 +427,12 @@ pub extern "C" fn ratatui_paragraph(
     });
 }
 
-/// `items`: newline-separated. `selected`: highlighted index, or -1 for none.
+/// Queues a [`List`](ratatui::widgets::List) widget.
+///
+/// # Parameters
+/// - `items`: newline-separated list entries.
+/// - `selected`: zero-based index of the highlighted row, or `-1` for no
+///   selection. The highlight uses `"> "` as the prefix and a bold modifier.
 #[no_mangle]
 pub extern "C" fn ratatui_list(
     handle: *mut c_void,
@@ -276,7 +451,11 @@ pub extern "C" fn ratatui_list(
     });
 }
 
-/// `ratio`: [0.0, 1.0]
+/// Queues a block-style [`Gauge`](ratatui::widgets::Gauge).
+///
+/// # Parameters
+/// - `ratio`: progress in `[0.0, 1.0]`. Values outside the range are clamped.
+/// - `label`: optional text overlaid on the gauge (pass `null` or empty for none).
 #[no_mangle]
 pub extern "C" fn ratatui_gauge(
     handle: *mut c_void,
@@ -295,7 +474,14 @@ pub extern "C" fn ratatui_gauge(
     });
 }
 
-/// `titles`: newline-separated tab titles.
+/// Queues a [`Tabs`](ratatui::widgets::Tabs) bar.
+///
+/// # Parameters
+/// - `titles`: newline-separated tab labels.
+/// - `selected`: zero-based index of the active tab.
+///
+/// The pending style's foreground color (or cyan if unset) is used as the
+/// highlight background of the active tab.
 #[no_mangle]
 pub extern "C" fn ratatui_tabs(
     handle: *mut c_void,
@@ -314,6 +500,11 @@ pub extern "C" fn ratatui_tabs(
     });
 }
 
+/// Queues a [`Sparkline`](ratatui::widgets::Sparkline) from raw `u64` samples.
+///
+/// # Parameters
+/// - `data`: pointer to `len` `u64` samples.
+/// - `len`: number of samples.
 #[no_mangle]
 pub extern "C" fn ratatui_sparkline(
     handle: *mut c_void,
@@ -328,7 +519,13 @@ pub extern "C" fn ratatui_sparkline(
     state.commands.push(WidgetCommand::Sparkline { area_id, data: data_vec, style });
 }
 
-/// `data`: first line = tab-separated headers; subsequent lines = tab-separated rows.
+/// Queues a [`Table`](ratatui::widgets::Table) with equal-width columns.
+///
+/// `data` format:
+/// - First line: tab-separated header cells.
+/// - Subsequent lines: one row per line; cells separated by tabs.
+///
+/// For typed column widths and row selection use [`ratatui_table_ex`].
 #[no_mangle]
 pub extern "C" fn ratatui_table(
     handle: *mut c_void,
@@ -347,7 +544,14 @@ pub extern "C" fn ratatui_table(
 
 // ─── New widgets: BarChart, LineGauge, Scrollbar, Calendar, TableEx ──────────
 
-/// `data`: newline-separated "label\tvalue" pairs.
+/// Queues a [`BarChart`](ratatui::widgets::BarChart).
+///
+/// `data` format: one bar per line, label and value separated by a tab.
+/// Malformed lines (missing tab or non-numeric value) are silently skipped.
+///
+/// # Parameters
+/// - `bar_width`: width of each bar in cells.
+/// - `bar_gap`: gap between bars in cells.
 #[no_mangle]
 pub extern "C" fn ratatui_barchart(
     handle: *mut c_void,
@@ -372,7 +576,11 @@ pub extern "C" fn ratatui_barchart(
     state.commands.push(WidgetCommand::BarChart { area_id, bars, bar_width, bar_gap, style });
 }
 
-/// Horizontal line gauge. `ratio`: [0.0, 1.0].
+/// Queues a horizontal single-line [`LineGauge`](ratatui::widgets::LineGauge).
+///
+/// # Parameters
+/// - `ratio`: progress in `[0.0, 1.0]`; values outside the range are clamped.
+/// - `label`: text shown next to the gauge (pass `null` or empty for none).
 #[no_mangle]
 pub extern "C" fn ratatui_line_gauge(
     handle: *mut c_void,
@@ -391,7 +599,14 @@ pub extern "C" fn ratatui_line_gauge(
     });
 }
 
-/// `orientation`: 0=VerticalRight, 1=VerticalLeft, 2=HorizontalBottom, 3=HorizontalTop
+/// Queues a [`Scrollbar`](ratatui::widgets::Scrollbar).
+///
+/// # Parameters
+/// - `content_length`: total scrollable length in cells.
+/// - `position`: current scroll offset in cells (`0..=content_length`).
+/// - `viewport_length`: visible portion of the content in cells.
+/// - `orientation`: `0` VerticalRight, `1` VerticalLeft, `2` HorizontalBottom,
+///   `3` HorizontalTop.
 #[no_mangle]
 pub extern "C" fn ratatui_scrollbar(
     handle: *mut c_void,
@@ -412,7 +627,17 @@ pub extern "C" fn ratatui_scrollbar(
     });
 }
 
-/// Render a monthly calendar. Requires the `widget-calendar` Cargo feature.
+/// Queues a monthly calendar
+/// ([`Monthly`](ratatui::widgets::calendar::Monthly)).
+///
+/// Invalid dates fall back to January 1 of `year`, and if that also fails,
+/// to 2024-01-01. The `widget-calendar` Cargo feature must be enabled
+/// (it is, by default, in this crate).
+///
+/// # Parameters
+/// - `year`: full year (e.g. `2026`).
+/// - `month`: `1..=12`.
+/// - `day`: `1..=28` (later days are clamped to `28` to avoid month overflow).
 #[no_mangle]
 pub extern "C" fn ratatui_calendar(
     handle: *mut c_void,
@@ -426,9 +651,19 @@ pub extern "C" fn ratatui_calendar(
     state.commands.push(WidgetCommand::Calendar { area_id, year, month, day });
 }
 
-/// Enhanced table with constraint-based column widths and row selection.
-/// `col_types`/`col_values`: constraint type+value per column (nullable for equal distribution).
-/// `selected_row`: highlighted row index, or -1 for none.
+/// Queues an extended [`Table`](ratatui::widgets::Table) with typed column
+/// widths and optional row highlighting.
+///
+/// `data` follows the same format as [`ratatui_table`] (first line headers,
+/// subsequent lines rows; tab-separated cells).
+///
+/// # Parameters
+/// - `col_types` / `col_values`: parallel arrays of length `col_count`
+///   describing each column's constraint kind and value. Same encoding as
+///   [`ratatui_split`]. Pass `null` (or `col_count == 0`) for equal-width
+///   distribution.
+/// - `selected_row`: zero-based index of the highlighted row, or `-1` for
+///   no selection. The highlight uses a bold modifier.
 #[no_mangle]
 pub extern "C" fn ratatui_table_ex(
     handle: *mut c_void,
@@ -461,8 +696,21 @@ pub extern "C" fn ratatui_table_ex(
 
 // ─── StyledParagraph builder ─────────────────────────────────────────────────
 
-/// Begin a styled paragraph. Subsequent `ratatui_styled_para_span` calls add spans.
-/// Finalize with `ratatui_styled_para_end`.
+/// Starts a multi-style paragraph builder.
+///
+/// Builder lifecycle:
+/// 1. [`ratatui_styled_para_begin`] — open the builder for `area_id`.
+/// 2. Zero or more [`ratatui_styled_para_span`] calls — append styled spans
+///    to the current line.
+/// 3. Zero or more [`ratatui_styled_para_newline`] calls — start a new line.
+/// 4. [`ratatui_styled_para_end`] — flush the builder into the command queue.
+///
+/// Only one styled-paragraph builder may be active at a time per handle.
+/// Beginning a new one before `_end` discards the previous one.
+///
+/// # Parameters
+/// - `alignment`: `0` Left, `1` Center, `2` Right.
+/// - `wrap`: non-zero to enable word wrapping (`trim: false`).
 #[no_mangle]
 pub extern "C" fn ratatui_styled_para_begin(
     handle: *mut c_void,
@@ -480,7 +728,11 @@ pub extern "C" fn ratatui_styled_para_begin(
     });
 }
 
-/// Add a styled span to the current line of the pending styled paragraph.
+/// Appends a styled [`Span`](ratatui::text::Span) to the current line of the
+/// pending styled paragraph.
+///
+/// Does nothing if no builder is active. Style parameters follow the same
+/// encoding as [`ratatui_set_style`].
 #[no_mangle]
 pub extern "C" fn ratatui_styled_para_span(
     handle: *mut c_void,
@@ -504,7 +756,9 @@ pub extern "C" fn ratatui_styled_para_span(
     }
 }
 
-/// Start a new line in the pending styled paragraph.
+/// Starts a new line in the pending styled paragraph.
+///
+/// Does nothing if no builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_styled_para_newline(handle: *mut c_void) {
     if handle.is_null() { return; }
@@ -514,7 +768,9 @@ pub extern "C" fn ratatui_styled_para_newline(handle: *mut c_void) {
     }
 }
 
-/// Finalize the styled paragraph and add it to the command queue.
+/// Finalizes the pending styled paragraph and queues it for rendering.
+///
+/// Does nothing if no builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_styled_para_end(handle: *mut c_void) {
     if handle.is_null() { return; }
@@ -531,8 +787,16 @@ pub extern "C" fn ratatui_styled_para_end(handle: *mut c_void) {
 
 // ─── Chart builder ────────────────────────────────────────────────────────────
 
-/// Begin a chart. Add axes with `ratatui_chart_x_axis`/`ratatui_chart_y_axis`,
-/// datasets with `ratatui_chart_dataset`. Finalize with `ratatui_chart_end`.
+/// Starts a [`Chart`](ratatui::widgets::Chart) builder.
+///
+/// Builder lifecycle:
+/// 1. [`ratatui_chart_begin`] — open the builder for `area_id`.
+/// 2. Optionally [`ratatui_chart_x_axis`] and/or [`ratatui_chart_y_axis`] —
+///    set axis titles and bounds.
+/// 3. Zero or more [`ratatui_chart_dataset`] calls — add datasets.
+/// 4. [`ratatui_chart_end`] — flush the builder into the command queue.
+///
+/// Only one chart builder may be active at a time per handle.
 #[no_mangle]
 pub extern "C" fn ratatui_chart_begin(handle: *mut c_void, area_id: u32) {
     if handle.is_null() { return; }
@@ -545,6 +809,9 @@ pub extern "C" fn ratatui_chart_begin(handle: *mut c_void, area_id: u32) {
     });
 }
 
+/// Sets the X axis title and `[min, max]` data bounds of the pending chart.
+///
+/// Does nothing if no chart builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_chart_x_axis(
     handle: *mut c_void,
@@ -559,6 +826,9 @@ pub extern "C" fn ratatui_chart_x_axis(
     }
 }
 
+/// Sets the Y axis title and `[min, max]` data bounds of the pending chart.
+///
+/// Does nothing if no chart builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_chart_y_axis(
     handle: *mut c_void,
@@ -573,8 +843,17 @@ pub extern "C" fn ratatui_chart_y_axis(
     }
 }
 
-/// Add a dataset. `data` is interleaved (x, y) f64 pairs; `point_count` is the number of pairs.
-/// `marker`: 0=Dot, 1=Braille, 2=HalfBlock, 3=Block
+/// Adds a [`Dataset`](ratatui::widgets::Dataset) to the pending chart.
+///
+/// # Parameters
+/// - `name`: dataset legend label.
+/// - `marker`: `0` Dot, `1` Braille, `2` HalfBlock, `3` Block.
+/// - `r`, `g`, `b`: dataset color.
+/// - `data`: pointer to `point_count * 2` `f64` values, interleaved as
+///   `[x0, y0, x1, y1, …]`.
+/// - `point_count`: number of `(x, y)` pairs.
+///
+/// Does nothing if no chart builder is active or `data` is null.
 #[no_mangle]
 pub extern "C" fn ratatui_chart_dataset(
     handle: *mut c_void,
@@ -598,7 +877,9 @@ pub extern "C" fn ratatui_chart_dataset(
     }
 }
 
-/// Finalize the chart and add it to the command queue.
+/// Finalizes the pending chart and queues it for rendering.
+///
+/// Does nothing if no chart builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_chart_end(handle: *mut c_void) {
     if handle.is_null() { return; }
@@ -615,8 +896,23 @@ pub extern "C" fn ratatui_chart_end(handle: *mut c_void) {
 
 // ─── Canvas builder ───────────────────────────────────────────────────────────
 
-/// Begin a canvas with the given bounds and marker type.
-/// Add shapes with subsequent calls. Finalize with `ratatui_canvas_end`.
+/// Starts a [`Canvas`](ratatui::widgets::canvas::Canvas) builder.
+///
+/// Builder lifecycle:
+/// 1. [`ratatui_canvas_begin`] — open the builder for `area_id` with the
+///    given data-space bounds and marker style.
+/// 2. Zero or more shape calls — [`ratatui_canvas_map`],
+///    [`ratatui_canvas_line`], [`ratatui_canvas_circle`],
+///    [`ratatui_canvas_rectangle`], [`ratatui_canvas_text`],
+///    [`ratatui_canvas_points`], [`ratatui_canvas_layer`].
+/// 3. [`ratatui_canvas_end`] — flush the builder into the command queue.
+///
+/// Only one canvas builder may be active at a time per handle.
+///
+/// # Parameters
+/// - `x_min`, `x_max`, `y_min`, `y_max`: data-space bounds mapped onto the
+///   area.
+/// - `marker`: `0` Dot, `1` Braille, `2` HalfBlock, `3` Block.
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_begin(
     handle: *mut c_void,
@@ -635,7 +931,12 @@ pub extern "C" fn ratatui_canvas_begin(
     });
 }
 
-/// Draw the world map. `resolution`: 0=Low, 1=High.
+/// Draws the world map on the pending canvas.
+///
+/// # Parameters
+/// - `resolution`: `0` Low, any other value High.
+///
+/// Does nothing if no canvas builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_map(handle: *mut c_void, resolution: u8) {
     if handle.is_null() { return; }
@@ -645,7 +946,10 @@ pub extern "C" fn ratatui_canvas_map(handle: *mut c_void, resolution: u8) {
     }
 }
 
-/// Flush the current layer (allows drawing on top of what's been drawn so far).
+/// Flushes the current canvas layer.
+///
+/// Subsequent shapes are drawn on a new layer on top of all previously drawn
+/// content. Does nothing if no canvas builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_layer(handle: *mut c_void) {
     if handle.is_null() { return; }
@@ -653,6 +957,9 @@ pub extern "C" fn ratatui_canvas_layer(handle: *mut c_void) {
     if let Some(ref mut p) = state.pending_canvas { p.shapes.push(CanvasShape::Layer); }
 }
 
+/// Draws a colored line from `(x1, y1)` to `(x2, y2)` on the pending canvas.
+///
+/// Coordinates are in data space (see [`ratatui_canvas_begin`]).
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_line(
     handle: *mut c_void,
@@ -666,6 +973,9 @@ pub extern "C" fn ratatui_canvas_line(
     }
 }
 
+/// Draws a colored circle centered at `(x, y)` with the given `radius`.
+///
+/// Coordinates are in data space (see [`ratatui_canvas_begin`]).
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_circle(
     handle: *mut c_void,
@@ -679,6 +989,9 @@ pub extern "C" fn ratatui_canvas_circle(
     }
 }
 
+/// Draws a colored rectangle outline anchored at `(x, y)` with size `(w, h)`.
+///
+/// Coordinates are in data space (see [`ratatui_canvas_begin`]).
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_rectangle(
     handle: *mut c_void,
@@ -692,6 +1005,9 @@ pub extern "C" fn ratatui_canvas_rectangle(
     }
 }
 
+/// Draws colored text anchored at `(x, y)` on the pending canvas.
+///
+/// Coordinates are in data space (see [`ratatui_canvas_begin`]).
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_text(
     handle: *mut c_void,
@@ -706,7 +1022,15 @@ pub extern "C" fn ratatui_canvas_text(
     }
 }
 
-/// `coords`: interleaved (x, y) f64 pairs; `count` is the number of pairs.
+/// Draws a colored point cloud on the pending canvas.
+///
+/// # Parameters
+/// - `coords`: pointer to `count * 2` `f64` values, interleaved as
+///   `[x0, y0, x1, y1, …]`.
+/// - `count`: number of `(x, y)` pairs.
+///
+/// Coordinates are in data space (see [`ratatui_canvas_begin`]). Does nothing
+/// if no canvas builder is active or `coords` is null.
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_points(
     handle: *mut c_void,
@@ -723,7 +1047,9 @@ pub extern "C" fn ratatui_canvas_points(
     }
 }
 
-/// Finalize the canvas and add it to the command queue.
+/// Finalizes the pending canvas and queues it for rendering.
+///
+/// Does nothing if no canvas builder is active.
 #[no_mangle]
 pub extern "C" fn ratatui_canvas_end(handle: *mut c_void) {
     if handle.is_null() { return; }
@@ -743,9 +1069,13 @@ pub extern "C" fn ratatui_canvas_end(handle: *mut c_void) {
 
 // ─── Input / Hit-Testing ─────────────────────────────────────────────────────
 
-/// Returns the most specific area ID at the given terminal cell coordinates.
-/// If multiple areas overlap, the one with the smallest area (most specific) is returned.
-/// Returns 0 (root) if no specific area contains the cell.
+/// Returns the most specific area id covering the given terminal cell.
+///
+/// When several registered areas contain `(col, row)` the one with the
+/// smallest cell count (the most deeply nested) wins. Returns `0` (root) when
+/// no registered area matches.
+///
+/// Useful for mapping pointer input back into the layout tree.
 #[no_mangle]
 pub extern "C" fn ratatui_hit_test(
     handle: *mut c_void,
@@ -771,9 +1101,18 @@ pub extern "C" fn ratatui_hit_test(
     best_id
 }
 
-/// Returns the cell-space rectangle of the given area_id as a packed u64.
-/// Format: x | (y << 16) | (width << 32) | (height << 48)
-/// Returns 0 if the area is not found.
+/// Returns the cell-space rectangle of the given area as a packed `u64`.
+///
+/// The four `u16` fields are packed little-endian:
+///
+/// ```text
+/// bits  0..16  -> x
+/// bits 16..32  -> y
+/// bits 32..48  -> width
+/// bits 48..64  -> height
+/// ```
+///
+/// Returns `0` if `handle` is null or the area id is unknown.
 #[no_mangle]
 pub extern "C" fn ratatui_get_area_rect(
     handle: *const c_void,
@@ -794,7 +1133,10 @@ pub extern "C" fn ratatui_get_area_rect(
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
-/// Returns the library version string as a static C string.
+/// Returns the library version as a static null-terminated C string.
+///
+/// The returned pointer is valid for the lifetime of the process and must
+/// not be freed by the caller. The value matches `CARGO_PKG_VERSION`.
 #[no_mangle]
 pub extern "C" fn ratatui_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char

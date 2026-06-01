@@ -1,3 +1,11 @@
+//! Layout splitting and frame-replay logic.
+//!
+//! The FFI layer at the crate root queues [`WidgetCommand`]s into
+//! [`TerminalState::commands`] and registers areas via
+//! [`do_split`]. At end-of-frame [`render_all_commands`] replays the queue
+//! into a single `terminal.draw()` call, materializing each command as a
+//! concrete ratatui widget.
+
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -15,14 +23,35 @@ use crate::terminal::{AxisInfo, CanvasShape, DatasetInfo, TerminalState, WidgetC
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
+/// Constraint type discriminant for [`Constraint::Length`].
 const CONSTRAINT_LENGTH: u8 = 0;
+/// Constraint type discriminant for [`Constraint::Min`].
 const CONSTRAINT_MIN: u8 = 1;
+/// Constraint type discriminant for [`Constraint::Max`].
 const CONSTRAINT_MAX: u8 = 2;
+/// Constraint type discriminant for [`Constraint::Percentage`].
 const CONSTRAINT_PERCENTAGE: u8 = 3;
+/// Constraint type discriminant for [`Constraint::Fill`].
+///
+/// The decoder treats any value other than the named discriminants as Fill,
+/// so this constant is unused at compile time but kept for documentation.
 #[allow(dead_code)]
 const CONSTRAINT_FILL: u8 = 4;
 
-/// Splits `area_id` and writes the resulting child area IDs into `out_ids`.
+/// Splits an existing area into child areas and registers each child in the
+/// state's area map.
+///
+/// # Parameters
+/// - `area_id`: parent area id.
+/// - `direction`: `0` horizontal, anything else vertical.
+/// - `constraint_types` / `constraint_values`: parallel slices describing
+///   each child's constraint kind and value. See [`constraint_from_bytes`].
+/// - `out_ids`: caller-allocated buffer that receives the new area ids in
+///   layout order.
+///
+/// Returns the number of child ids actually written, which is
+/// `min(constraint_types.len(), constraint_values.len(), out_ids.len(),
+/// computed_chunks.len())`. Returns `0` when the parent id is unknown.
 pub fn do_split(
     state: &mut TerminalState,
     area_id: u32,
@@ -64,7 +93,22 @@ pub fn do_split(
 
 // ─── Frame rendering ─────────────────────────────────────────────────────────
 
-/// Replays all queued widget commands inside a single `terminal.draw()` call.
+/// Replays all queued [`WidgetCommand`]s inside a single
+/// [`Terminal::draw`](ratatui::Terminal::draw) call.
+///
+/// The command queue and the area map are taken out of `state` to avoid
+/// double-borrowing the terminal during the draw closure, then the area map
+/// is restored. The queue is left empty afterwards; [`crate::ratatui_begin_frame`]
+/// would clear it anyway.
+///
+/// Commands whose `area_id` is not present in the area map are silently
+/// skipped.
+///
+/// # Panics
+///
+/// Panics if the underlying ratatui terminal draw call returns an error,
+/// which on a [`TestBackend`](ratatui::backend::TestBackend) is unreachable
+/// in practice.
 pub fn render_all_commands(state: &mut TerminalState) {
     let commands = std::mem::take(&mut state.commands);
     let area_map = std::mem::take(&mut state.area_map);
@@ -289,6 +333,10 @@ pub fn render_all_commands(state: &mut TerminalState) {
 
 // ─── Table helpers ────────────────────────────────────────────────────────────
 
+/// Renders a simple equal-width table from `data`.
+///
+/// `data` format: first line tab-separated headers, subsequent lines
+/// tab-separated rows. All columns receive the same percentage width.
 fn render_table(frame: &mut ratatui::Frame, area: Rect, data: &str, style: Style) {
     let mut lines = data.lines();
     let headers: Vec<&str> = lines.next().unwrap_or("").split('\t').collect();
@@ -306,6 +354,12 @@ fn render_table(frame: &mut ratatui::Frame, area: Rect, data: &str, style: Style
     );
 }
 
+/// Renders an extended table with typed column constraints and optional row
+/// highlighting.
+///
+/// If `col_constraints` is empty all columns get equal percentage widths.
+/// A non-negative `selected_row` enables a stateful render with a bold
+/// highlight on the selected row.
 fn render_table_ex(
     frame: &mut ratatui::Frame,
     area: Rect,
@@ -345,6 +399,10 @@ fn render_table_ex(
 
 // ─── Calendar ────────────────────────────────────────────────────────────────
 
+/// Renders a monthly calendar for the given date.
+///
+/// Invalid dates fall back to January 1 of `year`; if even that fails, the
+/// renderer uses 2024-01-01 as a last-resort hardcoded date.
 fn render_calendar(frame: &mut ratatui::Frame, area: Rect, year: i32, month: u8, day: u8) {
     use ratatui::widgets::calendar::{CalendarEventStore, Monthly};
 
@@ -364,6 +422,8 @@ fn render_calendar(frame: &mut ratatui::Frame, area: Rect, year: i32, month: u8,
     frame.render_widget(calendar, area);
 }
 
+/// Maps a `1..=12` month index to [`time::Month`]; out-of-range values fall
+/// back to January.
 fn month_to_time(month: u8) -> time::Month {
     match month {
         1 => time::Month::January,
@@ -384,6 +444,10 @@ fn month_to_time(month: u8) -> time::Month {
 
 // ─── Chart ───────────────────────────────────────────────────────────────────
 
+/// Builds a [`Chart`] from optional axes and datasets and renders it.
+///
+/// Axis titles use a gray foreground; dataset colors come from each
+/// [`DatasetInfo`]. Markers map via [`marker_from_u8`].
 fn render_chart(
     frame: &mut ratatui::Frame,
     area: Rect,
@@ -426,6 +490,11 @@ fn render_chart(
 
 // ─── Canvas ───────────────────────────────────────────────────────────────────
 
+/// Renders a canvas widget by replaying every queued [`CanvasShape`].
+///
+/// `CanvasShape::Layer` triggers a `ctx.layer()` flush so subsequent shapes
+/// draw on top. Text shapes clone their string because `ctx.print` requires
+/// `Into<Line<'static>>`.
 fn render_canvas(
     frame: &mut ratatui::Frame,
     area: Rect,
@@ -508,6 +577,14 @@ fn render_canvas(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/// Decodes a `(constraint_type, value)` pair into a ratatui [`Constraint`].
+///
+/// Mapping:
+/// - `0` → [`Constraint::Length`]
+/// - `1` → [`Constraint::Min`]
+/// - `2` → [`Constraint::Max`]
+/// - `3` → [`Constraint::Percentage`]
+/// - any other → [`Constraint::Fill`]
 fn constraint_from_bytes(t: u8, v: u16) -> Constraint {
     match t {
         CONSTRAINT_LENGTH => Constraint::Length(v),
@@ -518,6 +595,10 @@ fn constraint_from_bytes(t: u8, v: u16) -> Constraint {
     }
 }
 
+/// Decodes a packed border bit field into [`Borders`].
+///
+/// Bits: `0x01` Top, `0x02` Bottom, `0x04` Left, `0x08` Right. The value
+/// `0x0F` is treated as `Borders::ALL`.
 fn borders_from_u8(b: u8) -> Borders {
     if b == 0x0F {
         return Borders::ALL;
@@ -530,6 +611,8 @@ fn borders_from_u8(b: u8) -> Borders {
     borders
 }
 
+/// Maps the FFI alignment code (`0` Left, `1` Center, `2` Right) to
+/// [`Alignment`]. Unknown values default to `Left`.
 fn alignment_from_u8(a: u8) -> Alignment {
     match a {
         1 => Alignment::Center,
@@ -538,6 +621,10 @@ fn alignment_from_u8(a: u8) -> Alignment {
     }
 }
 
+/// Maps the FFI marker code to [`symbols::Marker`].
+///
+/// `0` Dot, `1` Braille, `2` HalfBlock, `3` Block. Unknown values default to
+/// `Dot`.
 fn marker_from_u8(m: u8) -> symbols::Marker {
     match m {
         1 => symbols::Marker::Braille,
@@ -547,6 +634,10 @@ fn marker_from_u8(m: u8) -> symbols::Marker {
     }
 }
 
+/// Maps the FFI scrollbar orientation code to [`ScrollbarOrientation`].
+///
+/// `0` VerticalRight, `1` VerticalLeft, `2` HorizontalBottom, `3` HorizontalTop.
+/// Unknown values default to `VerticalRight`.
 fn scrollbar_orientation_from_u8(o: u8) -> ScrollbarOrientation {
     match o {
         1 => ScrollbarOrientation::VerticalLeft,

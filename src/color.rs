@@ -1,10 +1,34 @@
+//! Conversion from ratatui [`Color`] values to RGB triples used by the
+//! rasterizer.
+//!
+//! Ratatui produces ANSI-named, indexed, and RGB colors; the pixel renderer
+//! needs a concrete `[u8; 3]`. This module also defines the default
+//! foreground / background fallback used when a cell's color is
+//! [`Color::Reset`].
+
 use ratatui::style::Color;
 
-/// Default foreground color (light gray on dark terminal)
+/// Default foreground RGB used when a cell foreground is [`Color::Reset`].
+///
+/// Light gray, chosen for readability over the default dark background.
 pub const DEFAULT_FG: [u8; 3] = [0xCC, 0xCC, 0xCC];
-/// Default background color (dark navy)
+
+/// Default background RGB used when a cell background is [`Color::Reset`]
+/// and the host has not overridden it via
+/// [`crate::ratatui_set_background_color`]. Dark navy.
 pub const DEFAULT_BG: [u8; 3] = [0x1A, 0x1A, 0x2E];
 
+/// Converts a ratatui [`Color`] to an RGB triple.
+///
+/// # Parameters
+/// - `color`: source color from a ratatui [`Buffer`](ratatui::buffer::Buffer)
+///   cell.
+/// - `is_fg`: `true` selects [`DEFAULT_FG`] as the fallback for
+///   [`Color::Reset`]; `false` selects [`DEFAULT_BG`].
+///
+/// ANSI-named colors use the classic 16-color VGA palette, indexed colors
+/// use the standard xterm-256 cube and grayscale ramp, and
+/// [`Color::Rgb`] is passed through unchanged.
 pub fn color_to_rgb(color: Color, is_fg: bool) -> [u8; 3] {
     match color {
         Color::Reset => {
@@ -35,6 +59,11 @@ pub fn color_to_rgb(color: Color, is_fg: bool) -> [u8; 3] {
     }
 }
 
+/// Maps an 8-bit xterm-256 palette index to RGB.
+///
+/// - `0..=15`: ANSI 16-color palette (see [`ansi_color`]).
+/// - `16..=231`: 6×6×6 RGB cube.
+/// - `232..=255`: 24-step grayscale ramp.
 fn indexed_color(n: u8) -> [u8; 3] {
     match n {
         0..=15 => ansi_color(n),
@@ -53,6 +82,7 @@ fn indexed_color(n: u8) -> [u8; 3] {
     }
 }
 
+/// Returns the classic VGA-style RGB for an ANSI color index `0..=15`.
 fn ansi_color(n: u8) -> [u8; 3] {
     const ANSI: [[u8; 3]; 16] = [
         [0x00, 0x00, 0x00], // 0  Black

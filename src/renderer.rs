@@ -1,3 +1,17 @@
+//! Cell-buffer → RGB24 pixel-buffer rasterization.
+//!
+//! This module turns a ratatui [`Buffer`] (a grid of styled glyphs) into
+//! flat RGB24 pixel data. It handles three render paths:
+//!
+//! - **Block elements** (`U+2580..=U+259F`) — painted directly in pixel
+//!   space for crisp connections between adjacent cells.
+//! - **Braille patterns** (`U+2800..=U+28FF`) — painted as 2×4 dot grids.
+//! - **Everything else** — rasterized through fontdue and alpha-composited
+//!   over the cell background.
+//!
+//! It also exposes [`compute_buffer_hash`], used to short-circuit
+//! rasterization when the cell buffer is unchanged frame-to-frame.
+
 use crate::color::color_to_rgb;
 use crate::font::FontManager;
 use fontdue::Metrics;
@@ -6,8 +20,11 @@ use ratatui::style::Color;
 use rustc_hash::FxHasher;
 use std::hash::{Hash, Hasher};
 
-/// Computes a hash over all cell fields that affect visual output.
-/// Used for dirty-checking: if hash is unchanged, pixel rasterization can be skipped.
+/// Computes a 64-bit hash over every cell field that affects visual output
+/// (symbol, foreground, background, modifier).
+///
+/// Used by [`crate::ratatui_end_frame_hashed`] to skip rasterization
+/// when the cell buffer is identical to the previous frame.
 pub fn compute_buffer_hash(buffer: &Buffer) -> u64 {
     let mut hasher = FxHasher::default();
     let area = buffer.area();
@@ -24,8 +41,19 @@ pub fn compute_buffer_hash(buffer: &Buffer) -> u64 {
     hasher.finish()
 }
 
-/// Converts a ratatui `Buffer` (cell grid) into a flat RGB24 pixel buffer.
-/// Reuses the provided `pixels` Vec to avoid per-frame allocation.
+/// Rasterizes a ratatui [`Buffer`] (cell grid) into a flat RGB24 pixel buffer.
+///
+/// # Parameters
+/// - `buffer`: source cell grid.
+/// - `font`: font + glyph cache; glyphs missing in the font are silently
+///   skipped instead of being drawn as `.notdef`.
+/// - `pixels`: destination byte buffer, reused across frames and resized to
+///   `cols * cell_width * rows * cell_height * 3` bytes as needed.
+/// - `background_color`: RGB used in place of [`Color::Reset`] for cell
+///   backgrounds.
+///
+/// Layout: the output is row-major, three bytes per pixel (R, G, B), with no
+/// padding between rows.
 pub fn render_buffer_to_pixels(
     buffer: &Buffer,
     font: &mut FontManager,
@@ -282,6 +310,7 @@ fn box_drawing_segments(ch: char) -> (bool, bool, bool, bool) {
 
 // ─── Font-based glyph renderer ───────────────────────────────────────────────
 
+/// Fills a full cell rectangle with `bg`.
 fn fill_background(
     pixels: &mut [u8],
     cell_px: u32,
@@ -301,6 +330,12 @@ fn fill_background(
     }
 }
 
+/// Alpha-composites a fontdue coverage bitmap over the cell at
+/// `(cell_px, cell_py)` using `fg` as the source color.
+///
+/// `bitmap` is a row-major coverage map of size `metrics.width × metrics.height`.
+/// The glyph is positioned using `metrics.xmin` / `metrics.ymin` relative to
+/// the baseline; pixels falling outside the cell are clipped.
 fn draw_glyph(
     pixels: &mut [u8],
     bitmap: &[u8],
