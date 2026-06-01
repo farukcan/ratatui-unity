@@ -27,6 +27,14 @@ mergeInto(LibraryManager.library, {
     return _ratatui_end_frame(handle);
   },
 
+  ratatui_end_frame_hashed: function(handle) {
+    return _ratatui_end_frame_hashed(handle);
+  },
+
+  ratatui_set_background_color: function(handle, r, g, b) {
+    _ratatui_set_background_color(handle, r, g, b);
+  },
+
   ratatui_pixel_width: function(handle) {
     return _ratatui_pixel_width(handle);
   },

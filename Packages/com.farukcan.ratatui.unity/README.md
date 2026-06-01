@@ -81,7 +81,7 @@ public class MyTerminal : RatatuiRenderer
 | Method                                   | Description                         |
 | ---------------------------------------- | ----------------------------------- |
 | `BeginFrame()`                           | Start a new frame                   |
-| `EndFrame()`                             | Render and return RGBA32 pixel data |
+| `EndFrame()`                             | Render and return RGB24 pixel data  |
 | `Split(area, direction, constraints)`    | Divide an area into children        |
 | `Block(area, title, borders)`            | Bordered box                        |
 | `Paragraph(area, text, alignment, wrap)` | Text block                          |
