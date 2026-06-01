@@ -95,7 +95,8 @@ Knobs:
 |-------|---------|---------|
 | `cols`, `rows` | 120 × 32 | Terminal grid |
 | `fontSize` | 14 px | Glyph size in pixels |
-| `displayMode` | `Partial` | `Full` stretches to screen, `Partial` uses native pixel size |
+| `displayMode` | `Window` | `Full` stretches to screen, `Partial` uses native pixel size, `Window` is a draggable frame whose title bar shows the host GameObject name |
+| `windowStartMaximized` | `true` | When `displayMode` is `Window`, maximize on first open |
 | `horizontalAlign` / `verticalAlign` | Center / Top | Placement in `Partial` mode |
 | `backgroundColor` | `#121221` | Terminal background |
 | `toggleKey` | `` ` `` (BackQuote) | Open/close key |

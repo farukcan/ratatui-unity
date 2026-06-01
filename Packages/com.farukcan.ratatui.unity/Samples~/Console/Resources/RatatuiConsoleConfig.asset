@@ -15,7 +15,7 @@ MonoBehaviour:
   cols: 120
   rows: 32
   fontSize: 22
-  displayMode: 0
+  displayMode: 2
   horizontalAlign: 1
   verticalAlign: 1
   backgroundColor: {r: 0.013043475, g: 0, b: 0.05, a: 1}

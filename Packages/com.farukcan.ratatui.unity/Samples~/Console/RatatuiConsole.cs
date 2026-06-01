@@ -74,7 +74,7 @@ namespace RatatuiUnity.Samples.Console
             Application.quitting += OnApplicationQuitting;
             BuiltinCommands.Register();
 
-            _go = new GameObject("[RatatuiConsole]");
+            _go = new GameObject("Ratatui Unity Developer Console");
             _go.hideFlags = HideFlags.HideAndDontSave;
             UnityEngine.Object.DontDestroyOnLoad(_go);
             _renderer = _go.AddComponent<RatatuiConsoleRenderer>();

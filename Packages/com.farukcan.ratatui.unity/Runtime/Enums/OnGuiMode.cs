@@ -13,5 +13,11 @@ namespace RatatuiUnity
         /// positioned according to horizontal and vertical alignment.
         /// </summary>
         Partial,
+
+        /// <summary>
+        /// Draggable macOS-style window with title bar (close disabled, minimize, fullscreen).
+        /// Native pixel size like <see cref="Partial"/>; position is interactive.
+        /// </summary>
+        Window,
     }
 }

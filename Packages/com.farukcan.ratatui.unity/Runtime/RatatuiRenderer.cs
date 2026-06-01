@@ -10,7 +10,9 @@ namespace RatatuiUnity
     /// <see cref="MeshRenderer"/> material each frame.
     /// When no target is assigned, falls back to OnGUI rendering.
     /// Use <see cref="OnGuiMode.Full"/> to stretch the terminal to the entire screen,
-    /// or <see cref="OnGuiMode.Partial"/> to draw at native pixel size with configurable alignment.
+    /// <see cref="OnGuiMode.Partial"/> to draw at native pixel size with configurable alignment,
+    /// or <see cref="OnGuiMode.Window"/> for a draggable macOS-style window whose title bar
+    /// shows <c>gameObject.name</c>.
     ///
     /// Override <see cref="BuildFrame"/> to define widget layout.
     /// Override <see cref="OnTerminalKeyDown"/>, <see cref="OnTerminalMouseEvent"/>,
@@ -42,7 +44,8 @@ namespace RatatuiUnity
         [SerializeField] private Renderer _meshRenderer;
 
         [Header("OnGUI")]
-        [Tooltip("Full: stretch to entire screen. Partial: native texture size with alignment.")]
+        [Tooltip("Full: stretch to entire screen. Partial: native texture size with alignment. " +
+                 "Window: draggable macOS-style window with title bar.")]
         [SerializeField] private OnGuiMode _onGuiMode = OnGuiMode.Full;
 
         [Tooltip("Horizontal placement when OnGUI mode is Partial.")]
@@ -50,6 +53,21 @@ namespace RatatuiUnity
 
         [Tooltip("Vertical placement when OnGUI mode is Partial.")]
         [SerializeField] private OnGuiVerticalAlign _onGuiVerticalAlign = OnGuiVerticalAlign.Center;
+
+        [Tooltip("Height of the title bar in pixels (Window mode only).")]
+        [SerializeField] private float _windowTitleBarHeight = 24f;
+
+        [Tooltip("Background color of the draggable title bar (Window mode only).")]
+        [SerializeField] private Color _windowTitleBarColor = new Color(0.09f, 0.09f, 0.09f);
+
+        [Tooltip("Initial window X position in screen GUI space. -1 = center on screen.")]
+        [SerializeField] private float _windowInitialX = -1f;
+
+        [Tooltip("Initial window Y position in screen GUI space. -1 = center on screen.")]
+        [SerializeField] private float _windowInitialY = -1f;
+
+        [Tooltip("Start maximized (fills screen) on first open in Window mode.")]
+        [SerializeField] private bool _windowStartMaximized;
 
         [Header("Input Settings")]
         [Tooltip("Enable input processing (keyboard + mouse).")]
@@ -112,6 +130,33 @@ namespace RatatuiUnity
         private const float KeyRepeatDelay = 0.4f;  // seconds before repeat starts
         private const float KeyRepeatRate = 0.035f; // seconds between repeats
 
+        // Window mode state
+        private Rect _windowRect;
+        private Rect _windowRestoreRect;
+        private bool _windowInitialized;
+        private bool _isDragging;
+        private Vector2 _dragStartMouse;
+        private Vector2 _dragStartWindowPos;
+        private bool _isMinimized;
+        private bool _isMaximized;
+
+        // Cached textures for tinted GUI fills (lazy init)
+        private static Texture2D _windowFillTexture;
+        private static Texture2D _windowCircleTexture;
+        private GUIStyle _windowTitleStyle;
+
+        // macOS traffic-light colors (close is permanently disabled → dim variant only)
+        private static readonly Color WindowMinimizeColor      = new Color(0.996f, 0.737f, 0.180f);
+        private static readonly Color WindowFullscreenColor    = new Color(0.157f, 0.784f, 0.251f);
+        private static readonly Color WindowTitleTextColor     = new Color(0.85f, 0.85f, 0.87f);
+        private static readonly Color WindowCloseDisabledColor = new Color(0.5f, 0.186f, 0.170f);
+
+        // Window chrome layout constants
+        private const float WindowButtonSize    = 12f;
+        private const float WindowButtonPadding = 8f;
+        private const float WindowButtonSpacing = 8f;
+        private const float WindowMinVisible    = 80f;
+
         // Non-character keys polled with GetKeyDown each frame
         private static readonly KeyCode[] TrackedKeys =
         {
@@ -157,8 +202,16 @@ namespace RatatuiUnity
             if (_rawImage == null && _meshRenderer == null)
                 UpdateOnGuiRect();
 
+            // Window mode: when minimized, skip terminal input and render pipeline.
+            // The title bar (and its drag/button handling) remains active via OnGUI.
+            bool windowMinimized = _onGuiMode == OnGuiMode.Window
+                && _rawImage == null && _meshRenderer == null
+                && _isMinimized;
+
             // Input runs before BuildFrame so state changes are reflected in the same frame
-            if (_enableInput) ProcessInput();
+            if (_enableInput && !windowMinimized) ProcessInput();
+
+            if (windowMinimized) return;
 
             // FPS throttle: skip entire render pipeline when interval hasn't elapsed
             if (_maxRenderFps > 0)
@@ -188,6 +241,23 @@ namespace RatatuiUnity
         {
             if (_rawImage != null || _meshRenderer != null) return;
             if (Texture == null) return;
+
+            if (_onGuiMode == OnGuiMode.Window)
+            {
+                EnsureWindowInitialized();
+                DrawWindowChrome();
+                if (!_isMinimized)
+                {
+                    Rect contentRect = new Rect(
+                        _windowRect.x,
+                        _windowRect.y + _windowTitleBarHeight,
+                        _windowRect.width,
+                        _windowRect.height - _windowTitleBarHeight);
+                    GUI.DrawTextureWithTexCoords(
+                        contentRect, Texture, new Rect(0f, 1f, 1f, -1f), false);
+                }
+                return;
+            }
 
             GUI.DrawTextureWithTexCoords(
                 _onGuiRect, Texture, new Rect(0f, 1f, 1f, -1f), false);
@@ -530,6 +600,20 @@ namespace RatatuiUnity
                 return;
             }
 
+            if (_onGuiMode == OnGuiMode.Window)
+            {
+                EnsureWindowInitialized();
+                // Terminal hit-testing uses _onGuiRect, so expose the content area
+                // (window rect minus title bar). Mouse over the title bar falls outside,
+                // so terminal mouse events do not fire while interacting with chrome.
+                _onGuiRect = new Rect(
+                    _windowRect.x,
+                    _windowRect.y + _windowTitleBarHeight,
+                    _windowRect.width,
+                    _windowRect.height - _windowTitleBarHeight);
+                return;
+            }
+
             float w = Texture.width;
             float h = Texture.height;
 
@@ -548,6 +632,206 @@ namespace RatatuiUnity
             };
 
             _onGuiRect = new Rect(x, y, w, h);
+        }
+
+        // ── Window Mode Helpers ───────────────────────────────────────────────
+
+        private void EnsureWindowInitialized()
+        {
+            if (_windowInitialized || Texture == null) return;
+
+            float w = Texture.width;
+            float h = Texture.height + _windowTitleBarHeight;
+            float x = _windowInitialX < 0f ? (Screen.width  - w) * 0.5f : _windowInitialX;
+            float y = _windowInitialY < 0f ? (Screen.height - h) * 0.5f : _windowInitialY;
+            _windowRect = new Rect(x, y, w, h);
+            _windowInitialized = true;
+
+            if (_windowStartMaximized)
+                ToggleMaximized();
+        }
+
+        private static Texture2D GetFillTexture()
+        {
+            if (_windowFillTexture == null)
+            {
+                _windowFillTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+                {
+                    hideFlags = HideFlags.HideAndDontSave,
+                };
+                _windowFillTexture.SetPixel(0, 0, Color.white);
+                _windowFillTexture.Apply();
+            }
+            return _windowFillTexture;
+        }
+
+        private static void FillRect(Rect rect, Color color)
+        {
+            Color prev = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, GetFillTexture());
+            GUI.color = prev;
+        }
+
+        private static Texture2D GetCircleTexture()
+        {
+            if (_windowCircleTexture != null) return _windowCircleTexture;
+
+            const int size = 32;
+            _windowCircleTexture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+
+            float center = (size - 1) * 0.5f;
+            float radius = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Mathf.Sqrt((x - center) * (x - center) + (y - center) * (y - center));
+                    float alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                    _windowCircleTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            _windowCircleTexture.Apply();
+            return _windowCircleTexture;
+        }
+
+        private static void FillCircle(Rect rect, Color color)
+        {
+            Color prev = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, GetCircleTexture(), ScaleMode.StretchToFill, true);
+            GUI.color = prev;
+        }
+
+        private GUIStyle GetWindowTitleStyle()
+        {
+            if (_windowTitleStyle == null)
+            {
+                _windowTitleStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 12,
+                    clipping = TextClipping.Clip,
+                    wordWrap = false,
+                };
+                _windowTitleStyle.normal.textColor = WindowTitleTextColor;
+            }
+            return _windowTitleStyle;
+        }
+
+        private void DrawWindowTitle(Rect titleBarRect)
+        {
+            GUI.Label(titleBarRect, gameObject.name, GetWindowTitleStyle());
+        }
+
+        private void DrawWindowChrome()
+        {
+            // Title bar background
+            Rect titleBarRect = new Rect(
+                _windowRect.x, _windowRect.y,
+                _windowRect.width, _windowTitleBarHeight);
+            FillRect(titleBarRect, _windowTitleBarColor);
+            DrawWindowTitle(titleBarRect);
+
+            // Traffic-light buttons (left side, vertically centered)
+            float btnY = _windowRect.y + (_windowTitleBarHeight - WindowButtonSize) * 0.5f;
+            float btnX = _windowRect.x + WindowButtonPadding;
+
+            Rect closeRect      = new Rect(btnX, btnY, WindowButtonSize, WindowButtonSize);
+            Rect minimizeRect   = new Rect(btnX + (WindowButtonSize + WindowButtonSpacing),
+                                           btnY, WindowButtonSize, WindowButtonSize);
+            Rect fullscreenRect = new Rect(btnX + (WindowButtonSize + WindowButtonSpacing) * 2f,
+                                           btnY, WindowButtonSize, WindowButtonSize);
+
+            // Close: disabled, visually dim — no click handling
+            FillCircle(closeRect, WindowCloseDisabledColor);
+
+            HandleWindowDrag(titleBarRect, closeRect, minimizeRect, fullscreenRect);
+
+            // Minimize: yellow toggle
+            FillCircle(minimizeRect, WindowMinimizeColor);
+            if (Event.current.type == EventType.MouseDown
+                && Event.current.button == 0
+                && minimizeRect.Contains(Event.current.mousePosition))
+            {
+                _isMinimized = !_isMinimized;
+                Event.current.Use();
+            }
+
+            // Fullscreen: green toggle
+            FillCircle(fullscreenRect, WindowFullscreenColor);
+            if (Event.current.type == EventType.MouseDown
+                && Event.current.button == 0
+                && fullscreenRect.Contains(Event.current.mousePosition))
+            {
+                ToggleMaximized();
+                Event.current.Use();
+            }
+        }
+
+        private void ToggleMaximized()
+        {
+            if (_isMaximized)
+            {
+                _windowRect = _windowRestoreRect;
+                _isMaximized = false;
+            }
+            else
+            {
+                _windowRestoreRect = _windowRect;
+                _windowRect = new Rect(0f, 0f, Screen.width, Screen.height);
+                _isMaximized = true;
+            }
+        }
+
+        private void HandleWindowDrag(Rect titleBarRect, Rect closeRect, Rect minimizeRect, Rect fullscreenRect)
+        {
+            // Disable drag while maximized — restoring via fullscreen toggle keeps semantics simple.
+            if (_isMaximized) return;
+
+            Event e = Event.current;
+            Vector2 mouse = e.mousePosition;
+
+            switch (e.type)
+            {
+                case EventType.MouseDown:
+                    if (e.button != 0) return;
+                    if (!titleBarRect.Contains(mouse)) return;
+                    if (closeRect.Contains(mouse)
+                        || minimizeRect.Contains(mouse)
+                        || fullscreenRect.Contains(mouse)) return;
+                    _isDragging = true;
+                    _dragStartMouse = mouse;
+                    _dragStartWindowPos = _windowRect.position;
+                    e.Use();
+                    break;
+
+                case EventType.MouseDrag:
+                    if (!_isDragging) return;
+                    Vector2 newPos = _dragStartWindowPos + (mouse - _dragStartMouse);
+                    // Keep at least WindowMinVisible of the title bar visible on screen.
+                    float maxX = Screen.width  - WindowMinVisible;
+                    float minX = WindowMinVisible - _windowRect.width;
+                    float maxY = Screen.height - _windowTitleBarHeight;
+                    float minY = 0f;
+                    newPos.x = Mathf.Clamp(newPos.x, minX, maxX);
+                    newPos.y = Mathf.Clamp(newPos.y, minY, maxY);
+                    _windowRect.position = newPos;
+                    e.Use();
+                    break;
+
+                case EventType.MouseUp:
+                    if (_isDragging)
+                    {
+                        _isDragging = false;
+                        e.Use();
+                    }
+                    break;
+            }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────

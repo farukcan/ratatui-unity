@@ -24,14 +24,18 @@ namespace RatatuiUnity.Samples.Console
         public float fontSize = 14f;
 
         [Header("Display")]
-        [Tooltip("Full: stretch to entire screen. Partial: native pixel size with alignment.")]
-        public OnGuiMode displayMode = OnGuiMode.Partial;
+        [Tooltip("Full: stretch to entire screen. Partial: native pixel size with alignment. " +
+                 "Window: draggable macOS-style window with title bar.")]
+        public OnGuiMode displayMode = OnGuiMode.Window;
 
         [Tooltip("Horizontal placement when displayMode is Partial.")]
         public OnGuiHorizontalAlign horizontalAlign = OnGuiHorizontalAlign.Center;
 
         [Tooltip("Vertical placement when displayMode is Partial.")]
         public OnGuiVerticalAlign verticalAlign = OnGuiVerticalAlign.Top;
+
+        [Tooltip("When displayMode is Window, start maximized on first open.")]
+        public bool windowStartMaximized = true;
 
         [Tooltip("Background color of the terminal (alpha ignored).")]
         public Color backgroundColor = new Color(0.07f, 0.07f, 0.11f);

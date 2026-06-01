@@ -213,7 +213,7 @@ namespace RatatuiUnity.Samples.Console
 
         private void BuildHeader(RatatuiTerminal term, uint area)
         {
-            term.Block(area, " UNITY DEVELOPER CONSOLE ", Borders.All);
+            term.Block(area, " FILTERS ", Borders.All);
             uint inner = term.Inner(area);
 
             uint[] cols = term.Split(inner, Direction.Horizontal,
@@ -233,11 +233,11 @@ namespace RatatuiUnity.Samples.Console
 
             CountByKind(out int allCount, out int logCount, out int warnCount, out int errCount, out int excCount);
 
-            DrawTab(term, cols[0], $"(F2) [{allCount} ALL]",         Filter.All,        new Color(0.85f, 0.85f, 0.85f));
-            DrawTab(term, cols[1], $"(F3) [{logCount} LOGS]",        Filter.Logs,       new Color(0.45f, 0.85f, 0.9f));
-            DrawTab(term, cols[2], $"(F4) [{warnCount} WARNINGS]",   Filter.Warnings,   ColorWarn);
-            DrawTab(term, cols[3], $"(F5) [{errCount} ERRORS]",      Filter.Errors,     ColorError);
-            DrawTab(term, cols[4], $"(F6) [{excCount} EXCEPTIONS]",  Filter.Exceptions, ColorException);
+            DrawTab(term, cols[0], $"(F2) [{allCount} ALL]", Filter.All, new Color(0.85f, 0.85f, 0.85f));
+            DrawTab(term, cols[1], $"(F3) [{logCount} LOGS]", Filter.Logs, new Color(0.45f, 0.85f, 0.9f));
+            DrawTab(term, cols[2], $"(F4) [{warnCount} WARNINGS]", Filter.Warnings, ColorWarn);
+            DrawTab(term, cols[3], $"(F5) [{errCount} ERRORS]", Filter.Errors, ColorError);
+            DrawTab(term, cols[4], $"(F6) [{excCount} EXCEPTIONS]", Filter.Exceptions, ColorException);
             DrawSearch(term, cols[5]);
         }
 
@@ -725,10 +725,10 @@ namespace RatatuiUnity.Samples.Console
             // Function-key shortcuts work regardless of focus.
             switch (e.Key)
             {
-                case KeyCode.F2: _filter = Filter.All;        _logScroll = 0; return;
-                case KeyCode.F3: _filter = Filter.Logs;       _logScroll = 0; return;
-                case KeyCode.F4: _filter = Filter.Warnings;   _logScroll = 0; return;
-                case KeyCode.F5: _filter = Filter.Errors;     _logScroll = 0; return;
+                case KeyCode.F2: _filter = Filter.All; _logScroll = 0; return;
+                case KeyCode.F3: _filter = Filter.Logs; _logScroll = 0; return;
+                case KeyCode.F4: _filter = Filter.Warnings; _logScroll = 0; return;
+                case KeyCode.F5: _filter = Filter.Errors; _logScroll = 0; return;
                 case KeyCode.F6: _filter = Filter.Exceptions; _logScroll = 0; return;
                 case KeyCode.F7:
                     _focus = _focus == InputFocus.Search ? InputFocus.Prompt : InputFocus.Search;
@@ -1154,6 +1154,7 @@ namespace RatatuiUnity.Samples.Console
             t.GetField("_onGuiMode", flags)?.SetValue(this, cfg.displayMode);
             t.GetField("_onGuiHorizontalAlign", flags)?.SetValue(this, cfg.horizontalAlign);
             t.GetField("_onGuiVerticalAlign", flags)?.SetValue(this, cfg.verticalAlign);
+            t.GetField("_windowStartMaximized", flags)?.SetValue(this, cfg.windowStartMaximized);
             t.GetField("_enableInput", flags)?.SetValue(this, true);
             t.GetField("_enableMouseInput", flags)?.SetValue(this, true);
             t.GetField("_enableKeyboardInput", flags)?.SetValue(this, true);

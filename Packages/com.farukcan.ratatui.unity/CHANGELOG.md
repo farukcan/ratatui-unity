@@ -5,7 +5,8 @@ All notable changes to this package will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **OnGUI display modes** on `RatatuiRenderer`: `Full` (stretch to entire screen) and `Partial` (native texture size with horizontal/vertical alignment).
+- **OnGUI display modes** on `RatatuiRenderer`: `Full` (stretch to entire screen), `Partial` (native texture size with horizontal/vertical alignment), and `Window` (draggable macOS-style chrome).
+- **Window mode title bar** shows the host GameObject name (same as the object name in the Hierarchy).
 
 ### Fixed
 - Pixel buffer is now flipped vertically before upload so Unity's `Texture2D.LoadRawTextureData` (bottom-to-top / OpenGL row order) displays the terminal the right way up.
