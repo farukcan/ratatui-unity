@@ -1,0 +1,10 @@
+apiRules:
+  - exclude:
+      uidRegex: ^UnityEngine
+      type: Namespace
+  - exclude:
+      uidRegex: ^UnityEngine\.UI
+      type: Namespace
+  - exclude:
+      uidRegex: ^UnityEngine\.Events
+      type: Namespace
