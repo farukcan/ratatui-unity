@@ -57,8 +57,11 @@ namespace RatatuiUnity
         [Tooltip("Height of the title bar in pixels (Window mode only).")]
         [SerializeField] private float _windowTitleBarHeight = 24f;
 
-        [Tooltip("Background color of the draggable title bar (Window mode only).")]
+        [Tooltip("Title bar background color when this window is NOT focused (Window mode only).")]
         [SerializeField] private Color _windowTitleBarColor = new Color(0.09f, 0.09f, 0.09f);
+
+        [Tooltip("Title bar background color when this window IS focused (Window mode only).")]
+        [SerializeField] private Color _windowTitleBarColorFocused = new Color(0.18f, 0.18f, 0.20f);
 
         [Tooltip("Initial window X position in screen GUI space. -1 = center on screen.")]
         [SerializeField] private float _windowInitialX = -1f;
@@ -97,6 +100,12 @@ namespace RatatuiUnity
 
         /// <summary>Current mouse hover state in terminal coordinates.</summary>
         public TerminalHoverState HoverState { get; private set; }
+
+        /// <summary>True if this renderer is the currently focused one. See <see cref="RatatuiFocusManager"/>.</summary>
+        public bool IsFocused => RatatuiFocusManager.Focused == this;
+
+        /// <summary>Make this renderer the focused one. Equivalent to <see cref="RatatuiFocusManager.SetFocus(RatatuiRenderer)"/>.</summary>
+        public void RequestFocus() => RatatuiFocusManager.SetFocus(this);
 
         // ── Internal State ────────────────────────────────────────────────────
 
@@ -196,6 +205,16 @@ namespace RatatuiUnity
             ValidateInputRequirements();
         }
 
+        protected virtual void OnEnable()
+        {
+            RatatuiFocusManager.Register(this);
+        }
+
+        protected virtual void OnDisable()
+        {
+            RatatuiFocusManager.Unregister(this);
+        }
+
         protected virtual void Update()
         {
             // Update OnGUI rect before input so mouse coordinates are correct
@@ -241,6 +260,12 @@ namespace RatatuiUnity
         {
             if (_rawImage != null || _meshRenderer != null) return;
             if (Texture == null) return;
+
+            // Lower GUI.depth draws on top. Mode is the primary order (Window > Partial > Full),
+            // focus is the tiebreaker within a mode. Matches the mouse-routing arbitration so
+            // the visually-top window is also the one that receives input.
+            int subLayer = GetOnGuiSubLayer();   // Window=2, Partial=1, Full=0
+            GUI.depth = -subLayer * 10 + (IsFocused ? -1 : 0);
 
             if (_onGuiMode == OnGuiMode.Window)
             {
@@ -296,12 +321,33 @@ namespace RatatuiUnity
             TerminalHoverState oldState, TerminalHoverState newState)
         { }
 
+        /// <summary>
+        /// Called when this renderer gains or loses scene focus.
+        /// Override to react (e.g. update a visual). If overriding, call <c>base.OnFocusChanged(isFocused)</c>
+        /// to keep the held-key reset that prevents stale key-repeat after focus loss.
+        /// </summary>
+        protected virtual void OnFocusChanged(bool isFocused)
+        {
+            if (!isFocused)
+            {
+                // Reset held input state so regained focus doesn't replay stale events.
+                _heldKey = KeyCode.None;
+                _heldKeyTime = 0f;
+                _scrollAccumulator = 0f;
+            }
+        }
+
+        // Invoked by RatatuiFocusManager. Not part of the public surface.
+        internal void InvokeFocusChanged(bool isFocused) => OnFocusChanged(isFocused);
+
         // ── Input Processing ──────────────────────────────────────────────────
 
         private void ProcessInput()
         {
             var mods = GetCurrentModifiers();
-            if (_enableKeyboardInput) ProcessKeyboard(mods);
+            // Keyboard goes only to the focused renderer (multi-terminal arbitration).
+            // Mouse runs everywhere; TryGetTerminalCell already filters by raycast/rect hit.
+            if (_enableKeyboardInput && IsFocused) ProcessKeyboard(mods);
             if (_enableMouseInput) ProcessMouse(mods);
         }
 
@@ -361,12 +407,24 @@ namespace RatatuiUnity
 
             if (!TryGetTerminalCell(screenPos, out int col, out int row))
             {
-                // Mouse is outside the terminal
+                // Mouse is outside the terminal (or occluded by a higher-Z renderer).
                 if (HoverState.IsInside)
                 {
                     var outside = TerminalHoverState.Outside;
                     OnTerminalHoverChanged(HoverState, outside);
                     HoverState = outside;
+                }
+
+                // If a button was pressed on this renderer and an overlay then covered us
+                // (or the cursor left the surface entirely), synthesize an Up at the last
+                // known down-cell so drag/release handlers can finalize cleanly.
+                if (_mouseDownCol >= 0 && _mouseDownRow >= 0)
+                {
+                    OnTerminalMouseEvent(new TerminalMouseEvent(
+                        MouseEventType.Up, _mouseDownCol, _mouseDownRow, 0,
+                        _mouseDownButton, 0f, mods));
+                    _mouseDownCol = -1;
+                    _mouseDownRow = -1;
                 }
                 return;
             }
@@ -402,6 +460,10 @@ namespace RatatuiUnity
 
                 if (Input.GetMouseButtonDown(btn))
                 {
+                    // Click-to-focus: any mouse button down on this renderer's surface
+                    // transfers scene focus before the Down event is delivered.
+                    if (!IsFocused) RatatuiFocusManager.SetFocus(this);
+
                     _mouseDownCol = col;
                     _mouseDownRow = row;
                     _mouseDownButton = mouseBtn;
@@ -458,6 +520,20 @@ namespace RatatuiUnity
         protected bool TryGetTerminalCell(Vector2 screenPos, out int col, out int row)
         {
             col = row = 0;
+
+            // Z-order arbitration across all RatatuiRenderers in the scene.
+            // Priority: OnGUI > RawImage > MeshRenderer. Within the same layer,
+            // OnGUI defers to the focused window; RawImage defers to higher Canvas sortingOrder.
+            // Mesh path also busts its raycast cache so a moving overlay re-evaluates.
+            if (IsScreenPointObscuredByOverlay(this, screenPos))
+            {
+                if (_meshRenderer != null)
+                {
+                    _lastRayScreenPos = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+                    _lastRayValid = false;
+                }
+                return false;
+            }
 
             if (_rawImage != null)
             {
@@ -548,6 +624,130 @@ namespace RatatuiUnity
                 return true;
             }
 
+            return false;
+        }
+
+        // ── Overlay / Z-order Arbitration ─────────────────────────────────────
+
+        // Render-target categories used to order input precedence across renderers.
+        // Higher value = drawn on top = grabs input first.
+        private const int InputLayerMesh = 0;
+        private const int InputLayerRawImage = 1;
+        private const int InputLayerOnGui = 2;
+
+        private int GetInputLayer()
+        {
+            if (_rawImage != null) return InputLayerRawImage;
+            if (_meshRenderer != null) return InputLayerMesh;
+            return InputLayerOnGui;
+        }
+
+        // Sub-priority within the OnGUI input layer. Higher = drawn on top of the others.
+        // Window is draggable foreground; Partial is a fixed foreground rect;
+        // Full covers the screen and acts as a background canvas.
+        private int GetOnGuiSubLayer()
+        {
+            switch (_onGuiMode)
+            {
+                case OnGuiMode.Window:  return 2;
+                case OnGuiMode.Partial: return 1;
+                default: /* Full */     return 0;
+            }
+        }
+
+        // True when the given screen point falls within this renderer's visible surface.
+        // OnGUI rects are stored in GUI space (y=0 top); screenPos uses Input.mousePosition (y=0 bottom).
+        internal bool OccludesScreenPoint(Vector2 screenPos)
+        {
+            if (_rawImage != null)
+            {
+                if (!_rawImage.isActiveAndEnabled) return false;
+                // Respect Unity's click-through convention.
+                if (!_rawImage.raycastTarget) return false;
+                Camera cam = null;
+                var canvas = _rawImage.canvas;
+                if (canvas == null) return false;
+                if (canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                    cam = canvas.worldCamera;
+                return RectTransformUtility.RectangleContainsScreenPoint(
+                    _rawImage.rectTransform, screenPos, cam);
+            }
+
+            if (_meshRenderer != null)
+            {
+                // 3D meshes don't act as screen-space overlays; Physics.Raycast handles
+                // mesh-vs-mesh depth, so report false here.
+                return false;
+            }
+
+            // OnGUI fallback target
+            float guiY = Screen.height - screenPos.y;
+            var guiPoint = new Vector2(screenPos.x, guiY);
+
+            if (_onGuiMode == OnGuiMode.Window)
+            {
+                // _windowRect is populated by EnsureWindowInitialized inside OnGUI;
+                // before the first OnGUI tick it is (0,0,0,0).
+                if (!_windowInitialized) return false;
+                if (_isMinimized)
+                {
+                    var bar = new Rect(
+                        _windowRect.x, _windowRect.y,
+                        _windowRect.width, _windowTitleBarHeight);
+                    return bar.Contains(guiPoint);
+                }
+                return _windowRect.Contains(guiPoint);
+            }
+
+            if (_onGuiRect.width > 0f)
+                return _onGuiRect.Contains(guiPoint);
+
+            return false;
+        }
+
+        // Returns true if another RatatuiRenderer's surface sits above this one at screenPos.
+        // Cross-layer: OnGUI > RawImage > Mesh.
+        // Same-layer tiebreakers: OnGUI focused wins; RawImage higher canvas sortingOrder wins.
+        private static bool IsScreenPointObscuredByOverlay(RatatuiRenderer requester, Vector2 screenPos)
+        {
+            if (requester == null) return false;
+            int myLayer = requester.GetInputLayer();
+            var list = RatatuiFocusManager.Registered;
+            int count = list.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var other = list[i];
+                if (other == null || other == requester) continue;
+                if (!other.isActiveAndEnabled) continue;
+                if (!other.OccludesScreenPoint(screenPos)) continue;
+
+                int otherLayer = other.GetInputLayer();
+                if (otherLayer > myLayer) return true;
+                if (otherLayer < myLayer) continue;
+
+                // Same-layer arbitration
+                if (myLayer == InputLayerOnGui)
+                {
+                    // Within OnGUI: mode-based sub-priority first (Window > Partial > Full).
+                    // A Full-mode terminal covers the entire screen but acts as background,
+                    // so a Window or Partial above it must not be occluded by it.
+                    int mySub = requester.GetOnGuiSubLayer();
+                    int otherSub = other.GetOnGuiSubLayer();
+                    if (otherSub > mySub) return true;
+                    if (otherSub < mySub) continue;
+                    // Equal sub-layer: focused wins.
+                    if (other.IsFocused && !requester.IsFocused) return true;
+                }
+                else if (myLayer == InputLayerRawImage)
+                {
+                    int myOrder = requester._rawImage.canvas != null
+                        ? requester._rawImage.canvas.sortingOrder : 0;
+                    int otherOrder = other._rawImage.canvas != null
+                        ? other._rawImage.canvas.sortingOrder : 0;
+                    if (otherOrder > myOrder) return true;
+                }
+                // Mesh-vs-mesh depth is decided by Physics.Raycast.
+            }
             return false;
         }
 
@@ -734,7 +934,7 @@ namespace RatatuiUnity
             Rect titleBarRect = new Rect(
                 _windowRect.x, _windowRect.y,
                 _windowRect.width, _windowTitleBarHeight);
-            FillRect(titleBarRect, _windowTitleBarColor);
+            FillRect(titleBarRect, IsFocused ? _windowTitleBarColorFocused : _windowTitleBarColor);
             DrawWindowTitle(titleBarRect);
 
             // Traffic-light buttons (left side, vertically centered)
@@ -801,6 +1001,8 @@ namespace RatatuiUnity
                 case EventType.MouseDown:
                     if (e.button != 0) return;
                     if (!titleBarRect.Contains(mouse)) return;
+                    // Title bar click (anywhere, including the traffic-light buttons) focuses the window.
+                    if (!IsFocused) RatatuiFocusManager.SetFocus(this);
                     if (closeRect.Contains(mouse)
                         || minimizeRect.Contains(mouse)
                         || fullscreenRect.Contains(mouse)) return;

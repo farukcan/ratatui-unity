@@ -2,6 +2,8 @@
 
 `RatatuiRenderer` exposes virtual hooks for keyboard, mouse, and hover events. All input coordinates are in **terminal cells** (not pixels), and every interactive region is identified by the `uint` area ID returned from `Split` / `Inner`.
 
+> Running more than one `RatatuiRenderer` in the same scene? See [Focus & Multi-Terminal](focus-and-multi-terminal.md) — keyboard is gated to the focused renderer, mouse continues to route by hit-test.
+
 ## Hooks
 
 Override any of these on your `RatatuiRenderer` subclass:
