@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace RatatuiUnity
@@ -21,20 +22,44 @@ namespace RatatuiUnity
     public class RatatuiRenderer : MonoBehaviour
     {
         [Header("Terminal Settings")]
-        [Tooltip("Width of the terminal in character columns.")]
+        [Tooltip("Width of the terminal in character columns. " +
+                 "Overridden by FitColsAndRows when that toggle is on.")]
         [SerializeField] private int _cols = 80;
 
-        [Tooltip("Height of the terminal in character rows.")]
+        [Tooltip("Height of the terminal in character rows. " +
+                 "Overridden by FitColsAndRows when that toggle is on.")]
         [SerializeField] private int _rows = 24;
 
-        [Tooltip("Font size in pixels (affects texture resolution).")]
+        [Tooltip("Derive cols × rows from the available pixel area so the terminal matches " +
+                 "the target's aspect ratio. " +
+                 "Target = RawImage RectTransform when assigned; otherwise the screen " +
+                 "(OnGUI Full, OnGUI Window in fullscreen / WebGL fullscreen) or the window " +
+                 "content area in normal Window mode. " +
+                 "Recomputed on every refit when SizingMode is not Pixel.")]
+        [FormerlySerializedAs("_fitIntoRectTransform")]
+        [SerializeField] private bool _fitColsAndRows;
+
+        [Tooltip("Font size — interpretation depends on SizingMode. " +
+                 "Pixel: absolute pixels. " +
+                 "Vh / Vw / Vmin / Vmax: percent of viewport height / width / min / max, " +
+                 "e.g. fontSize=3 with Vh on a 1080px-tall viewport → 32.4px.")]
         [SerializeField] private float _fontSize = 14f;
 
-        [Tooltip("Derive cols/rows from the RawImage RectTransform size instead of using fixed values.")]
-        [SerializeField] private bool _fitIntoRectTransform;
+        [Tooltip("How fontSize is interpreted. " +
+                 "Pixel: absolute, terminal created once. " +
+                 "Vh / Vw / Vmin / Vmax: CSS-style viewport-relative units; terminal is recreated " +
+                 "whenever the target area or Screen.dpi changes so fontSize tracks the viewport.")]
+        [SerializeField] private SizingMode _sizingMode = SizingMode.Pixel;
 
         [Tooltip("The background color of the terminal (alpha is ignored — texture is always opaque).")]
         [SerializeField] private Color _backgroundColor = new Color(0.102f, 0.102f, 0.18f); // dark navy
+
+        [Header("Resolution / Readability")]
+        [Tooltip("How often (in seconds) the renderer polls Screen.width/height/dpi for changes. " +
+                 "RectTransform changes are detected immediately via OnRectTransformDimensionsChange — " +
+                 "this poll covers OnGUI paths and DPI metadata refreshes (e.g. mobile rotation). " +
+                 "Ignored in Pixel mode.")]
+        [SerializeField] private float _resizePollSeconds = 0.25f;
 
         [Header("Target (optional)")]
         [Tooltip("Assign to a UI RawImage to display the terminal texture.")]
@@ -107,10 +132,24 @@ namespace RatatuiUnity
         /// <summary>Make this renderer the focused one. Equivalent to <see cref="RatatuiFocusManager.SetFocus(RatatuiRenderer)"/>.</summary>
         public void RequestFocus() => RatatuiFocusManager.SetFocus(this);
 
+        /// <summary>
+        /// Fires after the terminal has been recreated due to a resize / DPI change.
+        /// Args: new cols, new rows, new fontSize (px). Not fired for the initial Awake construction.
+        /// Subscribers that cache <see cref="Terminal"/>, <see cref="Texture"/>, PixelWidth/PixelHeight,
+        /// or cell metrics must refresh from the current values.
+        /// </summary>
+        public event Action<int, int, float> OnTerminalResized;
+
         // ── Internal State ────────────────────────────────────────────────────
 
         // OnGUI fallback rect (GUI coordinates: y=0 at top)
         private Rect _onGuiRect;
+
+        // Frame on which _onGuiRect was last refreshed (set in UpdateOnGuiRect).
+        // Used by OccludesScreenPoint to ignore OnGUI renderers that have paused
+        // drawing (e.g. a console closed via SetOpen) and would otherwise keep
+        // occluding RawImage / Mesh renderers with a stale rect.
+        private int _lastOnGuiUpdateFrame = -1;
 
         // Track where mouse-down happened for click detection
         private int _mouseDownCol = -1;
@@ -149,6 +188,25 @@ namespace RatatuiUnity
         private bool _isMinimized;
         private bool _isMaximized;
 
+        // Resize / readability state
+        // Cached custom font bytes so resize-driven Terminal recreation can re-apply
+        // the user's font instead of falling back to the embedded JetBrains Mono.
+        private byte[] _customFontBytes;
+
+        // Reactive resize: set by OnRectTransformDimensionsChange, consumed in Update.
+        // Unity forbids destroying objects inside that callback, so we defer.
+        private bool _resizeDirty;
+
+        // Polling snapshot for OnGUI paths (no RectTransform) and DPI changes.
+        private float _resizePollTimer;
+        private int _lastScreenWidth;
+        private int _lastScreenHeight;
+        private float _lastScreenDpi;
+
+        // True once Awake has completed Terminal construction. Used to suppress
+        // OnRectTransformDimensionsChange callbacks that fire before Awake.
+        private bool _terminalReady;
+
         // Cached textures for tinted GUI fills (lazy init)
         private static Texture2D _windowFillTexture;
         private static Texture2D _windowCircleTexture;
@@ -186,23 +244,23 @@ namespace RatatuiUnity
 
         protected virtual void Awake()
         {
-            if (_fitIntoRectTransform)
-                CalculateColsRowsFromRectTransform();
-
-            Terminal = new RatatuiTerminal(_cols, _rows, _fontSize);
-            Terminal.SetBackgroundColor(_backgroundColor);
-            Texture = new Texture2D(
-                Terminal.PixelWidth,
-                Terminal.PixelHeight,
-                TextureFormat.RGB24,
-                mipChain: false)
-            {
-                filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp,
-            };
-            ApplyTextureTarget();
+            ReinitializeTerminal(firstTime: true);
             _cachedMainCamera = Camera.main;
             ValidateInputRequirements();
+            SnapshotScreenMetrics();
+        }
+
+        /// <summary>
+        /// Called by Unity whenever this GameObject's RectTransform (or a parent's)
+        /// changes size. Used to mark the terminal for refit when sizingMode is
+        /// a viewport-relative mode (Vh / Vw / Vmin / Vmax). Recreate is deferred to
+        /// <see cref="Update"/> because Unity disallows Destroy() from this callback.
+        /// </summary>
+        protected virtual void OnRectTransformDimensionsChange()
+        {
+            if (!_terminalReady) return;
+            if (_sizingMode == SizingMode.Pixel) return;
+            _resizeDirty = true;
         }
 
         protected virtual void OnEnable()
@@ -217,6 +275,12 @@ namespace RatatuiUnity
 
         protected virtual void Update()
         {
+            // Reactive refit: poll Screen metrics + drain RectTransform dirty flag.
+            // Both feed the same ReinitializeTerminal() path. Pixel mode opts out
+            // (absolute fontSize, no viewport tracking).
+            if (_sizingMode != SizingMode.Pixel)
+                CheckForResize();
+
             // Update OnGUI rect before input so mouse coordinates are correct
             if (_rawImage == null && _meshRenderer == null)
                 UpdateOnGuiRect();
@@ -680,7 +744,14 @@ namespace RatatuiUnity
                 return false;
             }
 
-            // OnGUI fallback target
+            // OnGUI fallback target.
+            // A renderer that hasn't refreshed its OnGUI rect this frame (or last frame,
+            // to stay robust against script execution order) is not currently presenting
+            // — e.g. a console closed via SetOpen that skips base.Update / OnGUI. Such a
+            // renderer must not occlude RawImage / Mesh terminals with its stale rect.
+            if (Time.frameCount - _lastOnGuiUpdateFrame > 1)
+                return false;
+
             float guiY = Screen.height - screenPos.y;
             var guiPoint = new Vector2(screenPos.x, guiY);
 
@@ -793,6 +864,10 @@ namespace RatatuiUnity
         private void UpdateOnGuiRect()
         {
             if (Texture == null) return;
+
+            // Mark this renderer as actively presenting its OnGUI surface this frame.
+            // OccludesScreenPoint uses this to skip renderers that have stopped drawing.
+            _lastOnGuiUpdateFrame = Time.frameCount;
 
             if (_onGuiMode == OnGuiMode.Full)
             {
@@ -986,6 +1061,12 @@ namespace RatatuiUnity
                 _windowRect = new Rect(0f, 0f, Screen.width, Screen.height);
                 _isMaximized = true;
             }
+
+            // Viewport-relative sizing: switching maximize state changes the target area,
+            // so the terminal needs a refit. Deferred to Update — Unity disallows native
+            // object destruction inside an OnGUI event flow.
+            if (_sizingMode != SizingMode.Pixel)
+                _resizeDirty = true;
         }
 
         private void HandleWindowDrag(Rect titleBarRect, Rect closeRect, Rect minimizeRect, Rect fullscreenRect)
@@ -1047,7 +1128,7 @@ namespace RatatuiUnity
             {
                 _rawImage.texture = Texture;
                 _rawImage.uvRect = new Rect(0f, 1f, 1f, -1f);
-                if (!_fitIntoRectTransform)
+                if (!_fitColsAndRows)
                     FitRawImageToTexture();
             }
 
@@ -1063,42 +1144,273 @@ namespace RatatuiUnity
         /// <summary>
         /// Resizes the assigned RawImage's RectTransform to exactly match the
         /// terminal texture dimensions (1 texture pixel = 1 screen pixel at 100% scale).
+        /// No-op when sizingMode is viewport-relative (Vh / Vw / Vmin / Vmax), since
+        /// in those modes the RectTransform is the input to sizing and overwriting
+        /// it would create a feedback loop.
         /// </summary>
         public void FitRawImageToTexture()
         {
             if (_rawImage == null || Terminal == null) return;
+            if (_sizingMode != SizingMode.Pixel) return;
             var rt = _rawImage.rectTransform;
             rt.sizeDelta = new Vector2(Terminal.PixelWidth, Terminal.PixelHeight);
         }
 
-        private void CalculateColsRowsFromRectTransform()
+        /// <summary>
+        /// Force an immediate refit + terminal recreation. Useful after manually
+        /// changing the RawImage RectTransform from code, or after switching sizingMode.
+        /// </summary>
+        public void ForceRefit()
         {
-            if (_rawImage == null)
+            if (!_terminalReady) return;
+            ReinitializeTerminal(firstTime: false);
+        }
+
+        /// <summary>
+        /// Replace the embedded JetBrains Mono font with a custom TTF font.
+        /// Caches the bytes so subsequent terminal recreations (resize / DPI change)
+        /// keep the user's font instead of falling back to the embedded default.
+        /// </summary>
+        /// <returns>True if the font was loaded successfully.</returns>
+        public bool SetCustomFont(byte[] ttfBytes)
+        {
+            if (Terminal == null) return false;
+            bool ok = Terminal.SetCustomFont(ttfBytes);
+            if (ok)
+                _customFontBytes = ttfBytes;
+            return ok;
+        }
+
+        // ── Refit Pipeline ────────────────────────────────────────────────────
+
+        private void CheckForResize()
+        {
+            _resizePollTimer += Time.unscaledDeltaTime;
+            bool poll = _resizePollSeconds <= 0f || _resizePollTimer >= _resizePollSeconds;
+
+            if (poll)
             {
-                Debug.LogWarning(
-                    "[RatatuiRenderer] FitIntoRectTransform requires a RawImage target.", this);
+                _resizePollTimer = 0f;
+                if (Screen.width != _lastScreenWidth
+                    || Screen.height != _lastScreenHeight
+                    || !Mathf.Approximately(Screen.dpi, _lastScreenDpi))
+                {
+                    _resizeDirty = true;
+                }
+            }
+
+            if (_resizeDirty)
+            {
+                _resizeDirty = false;
+                ReinitializeTerminal(firstTime: false);
+                SnapshotScreenMetrics();
+            }
+        }
+
+        private void SnapshotScreenMetrics()
+        {
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            _lastScreenDpi = Screen.dpi;
+        }
+
+        private void ReinitializeTerminal(bool firstTime)
+        {
+            float fontSize = ComputeFontSize();
+
+            int targetCols = _cols;
+            int targetRows = _rows;
+            if (_fitColsAndRows)
+                CalculateColsAndRows(fontSize, out targetCols, out targetRows);
+
+            // Tear down the old handle + GPU texture before creating the new ones.
+            // Order matters: dispose first to release the native pixel buffer,
+            // then Destroy the Texture2D so its size can change.
+            if (Terminal != null)
+            {
+                Terminal.Dispose();
+                Terminal = null;
+            }
+            if (Texture != null)
+            {
+                Destroy(Texture);
+                Texture = null;
+            }
+
+            Terminal = new RatatuiTerminal(targetCols, targetRows, fontSize);
+
+            // Re-apply state that lives on the native handle.
+            if (_customFontBytes != null && _customFontBytes.Length > 0)
+                Terminal.SetCustomFont(_customFontBytes);
+            Terminal.SetBackgroundColor(_backgroundColor);
+
+            Texture = new Texture2D(
+                Terminal.PixelWidth,
+                Terminal.PixelHeight,
+                TextureFormat.RGB24,
+                mipChain: false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+            };
+            ApplyTextureTarget();
+            SyncWindowRectToTexture();
+
+            _terminalReady = true;
+
+            if (!firstTime)
+                OnTerminalResized?.Invoke(Terminal.Cols, Terminal.Rows, fontSize);
+        }
+
+        /// <summary>
+        /// Resolve <see cref="_fontSize"/> to absolute pixels according to the current
+        /// <see cref="SizingMode"/>. In <c>Pixel</c> mode this is identity; in viewport-
+        /// relative modes it multiplies by the corresponding viewport dimension / 100.
+        /// </summary>
+        private float ComputeFontSize()
+        {
+            if (_sizingMode == SizingMode.Pixel)
+                return Mathf.Max(1f, _fontSize);
+
+            GetTargetPixelRect(out float width, out float height, fontSizeViewport: true);
+            float basis = _sizingMode switch
+            {
+                SizingMode.Vh   => height,
+                SizingMode.Vw   => width,
+                SizingMode.Vmin => Mathf.Min(width, height),
+                SizingMode.Vmax => Mathf.Max(width, height),
+                _               => 0f,
+            };
+            float fontSize = _fontSize * basis / 100f;
+            return Mathf.Max(1f, fontSize);
+        }
+
+        /// <param name="fontSizeViewport">
+        /// When <c>true</c>, the caller wants a *stable* viewport basis for fontSize
+        /// scaling rather than the live fill target. This matters only in OnGUI Window
+        /// normal mode: the fill target (<c>_windowRect</c>) is itself derived from the
+        /// texture, which is derived from fontSize — using it as the fontSize basis would
+        /// be self-referential and compound across refits. So fontSize always scales
+        /// against the screen (CSS-style viewport), while FitColsAndRows keeps filling
+        /// the actual window content area.
+        /// </param>
+        private void GetTargetPixelRect(out float width, out float height, bool fontSizeViewport = false)
+        {
+            if (_rawImage != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                Rect rect = _rawImage.rectTransform.rect;
+                width = rect.width;
+                height = rect.height;
                 return;
             }
 
-            Canvas.ForceUpdateCanvases();
-            Rect rect = _rawImage.rectTransform.rect;
-
-            if (rect.width <= 0f || rect.height <= 0f)
+            // OnGUI Window mode: target = the window's content area (title bar excluded).
+            // Recreate keeps the window the same logical size; the terminal grid stays
+            // fixed and fontSize adapts. When maximized, the window covers the screen.
+            if (_meshRenderer == null && _onGuiMode == OnGuiMode.Window)
             {
-                Debug.LogWarning(
-                    "[RatatuiRenderer] RectTransform has zero size, cannot fit terminal.", this);
+                // fontSize basis is always the screen (stable, non-circular).
+                bool useScreen = fontSizeViewport
+                    || _isMaximized
+                    || (!_windowInitialized && _windowStartMaximized);
+                if (useScreen)
+                {
+                    width = Screen.width;
+                    height = Mathf.Max(1f, Screen.height - _windowTitleBarHeight);
+                    return;
+                }
+                if (_windowInitialized)
+                {
+                    width = _windowRect.width;
+                    height = Mathf.Max(1f, _windowRect.height - _windowTitleBarHeight);
+                    return;
+                }
+                // First call before EnsureWindowInitialized — use a sane initial size
+                // (~70% of screen) so the very first auto fontSize lands somewhere usable.
+                width = Screen.width * 0.7f;
+                height = Mathf.Max(1f, Screen.height * 0.7f - _windowTitleBarHeight);
                 return;
             }
 
-            // Create a probe terminal to get cell dimensions for this font size
-            using (var probe = new RatatuiTerminal(1, 1, _fontSize))
+            // OnGUI Full / Partial / mesh fallback: fit to the full screen.
+            width = Screen.width;
+            height = Screen.height;
+        }
+
+        /// <summary>
+        /// After a recreate in a viewport-relative mode, snap the Window rect to the
+        /// new texture dimensions so the chrome wraps the terminal exactly. When
+        /// maximized, the window covers the screen and the terminal content fits inside.
+        /// </summary>
+        private void SyncWindowRectToTexture()
+        {
+            if (_meshRenderer != null) return;
+            if (_rawImage != null) return;
+            if (_onGuiMode != OnGuiMode.Window) return;
+            if (Terminal == null) return;
+
+            float w = Terminal.PixelWidth;
+            float h = Terminal.PixelHeight + _windowTitleBarHeight;
+
+            if (!_windowInitialized)
             {
+                float x = _windowInitialX < 0f ? (Screen.width - w) * 0.5f : _windowInitialX;
+                float y = _windowInitialY < 0f ? (Screen.height - h) * 0.5f : _windowInitialY;
+                _windowRect = new Rect(x, y, w, h);
+                _windowInitialized = true;
+                if (_windowStartMaximized && !_isMaximized)
+                    ToggleMaximized();
+                return;
+            }
+
+            if (_isMaximized)
+            {
+                // Maximized window already covers the screen — keep the rect at full
+                // screen so the new terminal (sized to Screen - titleBar) fits exactly.
+                // Leave _windowRestoreRect untouched: it holds the pre-maximize window
+                // size captured in ToggleMaximized, and un-maximizing must return to
+                // exactly that size. The restore refit recomputes the grid/texture to fit.
+                _windowRect = new Rect(0f, 0f, Screen.width, Screen.height);
+            }
+            else
+            {
+                _windowRect = new Rect(_windowRect.x, _windowRect.y, w, h);
+            }
+        }
+
+        /// <summary>
+        /// Compute cols × rows so the terminal grid covers the target pixel area at
+        /// the given fontSize, matching its aspect ratio. The target is whatever
+        /// <see cref="GetTargetPixelRect"/> resolves to — RawImage rect, window content,
+        /// or screen — so the same call works for RawImage, OnGUI Full, OnGUI Window
+        /// (normal + fullscreen), and WebGL fullscreen.
+        /// </summary>
+        private void CalculateColsAndRows(float fontSize, out int cols, out int rows)
+        {
+            cols = _cols;
+            rows = _rows;
+
+            GetTargetPixelRect(out float w, out float h);
+            if (w <= 0f || h <= 0f)
+            {
+                Debug.LogWarning(
+                    "[RatatuiRenderer] FitColsAndRows: target area has zero size, " +
+                    "falling back to inspector cols × rows.", this);
+                return;
+            }
+
+            using (var probe = new RatatuiTerminal(1, 1, fontSize))
+            {
+                if (_customFontBytes != null && _customFontBytes.Length > 0)
+                    probe.SetCustomFont(_customFontBytes);
+
                 int cellWidth = probe.CellWidth;
                 int cellHeight = probe.CellHeight;
                 if (cellWidth <= 0 || cellHeight <= 0) return;
 
-                _cols = Mathf.Max(1, Mathf.FloorToInt(rect.width / cellWidth));
-                _rows = Mathf.Max(1, Mathf.FloorToInt(rect.height / cellHeight));
+                cols = Mathf.Max(1, Mathf.FloorToInt(w / cellWidth));
+                rows = Mathf.Max(1, Mathf.FloorToInt(h / cellHeight));
             }
         }
     }

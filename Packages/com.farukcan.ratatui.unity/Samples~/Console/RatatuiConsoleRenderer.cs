@@ -1155,6 +1155,7 @@ namespace RatatuiUnity.Samples.Console
             t.GetField("_onGuiHorizontalAlign", flags)?.SetValue(this, cfg.horizontalAlign);
             t.GetField("_onGuiVerticalAlign", flags)?.SetValue(this, cfg.verticalAlign);
             t.GetField("_windowStartMaximized", flags)?.SetValue(this, cfg.windowStartMaximized);
+            t.GetField("_fitColsAndRows", flags)?.SetValue(this, true);
             t.GetField("_enableInput", flags)?.SetValue(this, true);
             t.GetField("_enableMouseInput", flags)?.SetValue(this, true);
             t.GetField("_enableKeyboardInput", flags)?.SetValue(this, true);

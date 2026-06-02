@@ -32,6 +32,8 @@ So a click on an OnGUI window over a Canvas RawImage over a mesh terminal only h
 
 `GUI.depth` is set per-renderer to match this same ordering, so the visually-top renderer is always the one that receives input.
 
+Occlusion only counts renderers that are **actually drawing**. An OnGUI renderer that has stopped painting (for example a developer console toggled closed, which skips its `Update`/`OnGUI`) no longer occludes anything, so `RawImage` and `MeshRenderer` terminals beneath it keep receiving mouse input. Hiding such a renderer therefore restores the terminals below it without any extra wiring.
+
 If you have two windows of the same kind overlapping and need deterministic arbitration, give them an explicit focus (call `RequestFocus()` on the one you want forward) or set distinct Canvas `sortingOrder` values.
 
 ## Lifecycle

@@ -93,7 +93,7 @@ Knobs:
 
 | Field | Default | Purpose |
 |-------|---------|---------|
-| `cols`, `rows` | 120 × 32 | Terminal grid |
+| `cols`, `rows` | 120 × 32 | Fallback terminal grid. The console enables **Fit Cols And Rows**, so the grid is derived from the available pixel area at startup (these values are only used if that area is unavailable). |
 | `fontSize` | 14 px | Glyph size in pixels |
 | `displayMode` | `Window` | `Full` stretches to screen, `Partial` uses native pixel size, `Window` is a draggable frame whose title bar shows the host GameObject name |
 | `windowStartMaximized` | `true` | When `displayMode` is `Window`, maximize on first open |
