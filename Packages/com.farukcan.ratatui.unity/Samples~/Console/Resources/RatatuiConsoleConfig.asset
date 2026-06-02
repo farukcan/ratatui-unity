@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RatatuiUnity.Samples.Console::RatatuiUnity.Samples.Console.RatatuiConsoleConfig
   cols: 120
   rows: 32
-  fontSize: 22
+  fontSize: 1.6
+  sizingMode: 3
   displayMode: 2
   horizontalAlign: 1
   verticalAlign: 1

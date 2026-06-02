@@ -132,6 +132,51 @@ namespace RatatuiUnity
         /// <summary>Make this renderer the focused one. Equivalent to <see cref="RatatuiFocusManager.SetFocus(RatatuiRenderer)"/>.</summary>
         public void RequestFocus() => RatatuiFocusManager.SetFocus(this);
 
+        // ── Configuration Properties ──────────────────────────────────────────
+        // Expose the serialized settings so subclasses / external code can
+        // configure the renderer before Awake without reflection. Changing these
+        // after the terminal has been created has no effect until the next
+        // terminal recreation.
+
+        /// <summary>Terminal width in character columns. Overridden by <see cref="FitColsAndRows"/>.</summary>
+        public int Cols { get => _cols; set => _cols = value; }
+
+        /// <summary>Terminal height in character rows. Overridden by <see cref="FitColsAndRows"/>.</summary>
+        public int Rows { get => _rows; set => _rows = value; }
+
+        /// <summary>Derive cols × rows from the available pixel area (see field tooltip).</summary>
+        public bool FitColsAndRows { get => _fitColsAndRows; set => _fitColsAndRows = value; }
+
+        /// <summary>Font size — interpretation depends on <see cref="SizingMode"/>.</summary>
+        public float FontSize { get => _fontSize; set => _fontSize = value; }
+
+        /// <summary>How <see cref="FontSize"/> is interpreted (absolute pixels or viewport-relative).</summary>
+        public SizingMode SizingMode { get => _sizingMode; set => _sizingMode = value; }
+
+        /// <summary>Terminal background color (alpha is ignored — texture is always opaque).</summary>
+        public Color BackgroundColor { get => _backgroundColor; set => _backgroundColor = value; }
+
+        /// <summary>OnGUI display mode: Full, Partial, or Window.</summary>
+        public OnGuiMode OnGuiDisplayMode { get => _onGuiMode; set => _onGuiMode = value; }
+
+        /// <summary>Horizontal placement when <see cref="OnGuiDisplayMode"/> is Partial.</summary>
+        public OnGuiHorizontalAlign OnGuiHorizontalAlignment { get => _onGuiHorizontalAlign; set => _onGuiHorizontalAlign = value; }
+
+        /// <summary>Vertical placement when <see cref="OnGuiDisplayMode"/> is Partial.</summary>
+        public OnGuiVerticalAlign OnGuiVerticalAlignment { get => _onGuiVerticalAlign; set => _onGuiVerticalAlign = value; }
+
+        /// <summary>Start maximized (fills screen) on first open in Window mode.</summary>
+        public bool WindowStartMaximized { get => _windowStartMaximized; set => _windowStartMaximized = value; }
+
+        /// <summary>Enable input processing (keyboard + mouse).</summary>
+        public bool EnableInput { get => _enableInput; set => _enableInput = value; }
+
+        /// <summary>Enable mouse input (hover, click, scroll).</summary>
+        public bool EnableMouseInput { get => _enableMouseInput; set => _enableMouseInput = value; }
+
+        /// <summary>Enable keyboard input.</summary>
+        public bool EnableKeyboardInput { get => _enableKeyboardInput; set => _enableKeyboardInput = value; }
+
         /// <summary>
         /// Fires after the terminal has been recreated due to a resize / DPI change.
         /// Args: new cols, new rows, new fontSize (px). Not fired for the initial Awake construction.

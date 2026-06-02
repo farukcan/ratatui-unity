@@ -94,7 +94,8 @@ Knobs:
 | Field | Default | Purpose |
 |-------|---------|---------|
 | `cols`, `rows` | 120 × 32 | Fallback terminal grid. The console enables **Fit Cols And Rows**, so the grid is derived from the available pixel area at startup (these values are only used if that area is unavailable). |
-| `fontSize` | 14 px | Glyph size in pixels |
+| `fontSize` | 1.6 | Glyph size. Interpreted per `sizingMode`: absolute pixels in `Pixel`, or percent of the viewport in `Vh` / `Vw` / `Vmin` / `Vmax` |
+| `sizingMode` | `Vmin` | How `fontSize` is interpreted. `Vmin` = percent of the smaller viewport dimension, so glyphs stay readable in both portrait and landscape |
 | `displayMode` | `Window` | `Full` stretches to screen, `Partial` uses native pixel size, `Window` is a draggable frame whose title bar shows the host GameObject name |
 | `windowStartMaximized` | `true` | When `displayMode` is `Window`, maximize on first open |
 | `horizontalAlign` / `verticalAlign` | Center / Top | Placement in `Partial` mode |

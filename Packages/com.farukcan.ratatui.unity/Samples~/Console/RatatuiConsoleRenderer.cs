@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
 using UnityEngine;
 
@@ -1141,24 +1140,23 @@ namespace RatatuiUnity.Samples.Console
             }
         }
 
-        // ── Reflection-based base-class field overrides ──────────────────────
+        // ── Base-class configuration overrides ───────────────────────────────
 
         private void ApplyConfigToBase(RatatuiConsoleConfig cfg)
         {
-            var t = typeof(RatatuiRenderer);
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-            t.GetField("_cols", flags)?.SetValue(this, cfg.cols);
-            t.GetField("_rows", flags)?.SetValue(this, cfg.rows);
-            t.GetField("_fontSize", flags)?.SetValue(this, cfg.fontSize);
-            t.GetField("_backgroundColor", flags)?.SetValue(this, cfg.backgroundColor);
-            t.GetField("_onGuiMode", flags)?.SetValue(this, cfg.displayMode);
-            t.GetField("_onGuiHorizontalAlign", flags)?.SetValue(this, cfg.horizontalAlign);
-            t.GetField("_onGuiVerticalAlign", flags)?.SetValue(this, cfg.verticalAlign);
-            t.GetField("_windowStartMaximized", flags)?.SetValue(this, cfg.windowStartMaximized);
-            t.GetField("_fitColsAndRows", flags)?.SetValue(this, true);
-            t.GetField("_enableInput", flags)?.SetValue(this, true);
-            t.GetField("_enableMouseInput", flags)?.SetValue(this, true);
-            t.GetField("_enableKeyboardInput", flags)?.SetValue(this, true);
+            Cols = cfg.cols;
+            Rows = cfg.rows;
+            FontSize = cfg.fontSize;
+            SizingMode = cfg.sizingMode;
+            BackgroundColor = cfg.backgroundColor;
+            OnGuiDisplayMode = cfg.displayMode;
+            OnGuiHorizontalAlignment = cfg.horizontalAlign;
+            OnGuiVerticalAlignment = cfg.verticalAlign;
+            WindowStartMaximized = cfg.windowStartMaximized;
+            FitColsAndRows = true;
+            EnableInput = true;
+            EnableMouseInput = true;
+            EnableKeyboardInput = true;
         }
     }
 }

@@ -20,8 +20,13 @@ namespace RatatuiUnity.Samples.Console
         [Tooltip("Terminal height in character rows.")]
         public int rows = 32;
 
-        [Tooltip("Font size in pixels.")]
+        [Tooltip("Font size — interpretation depends on sizingMode. " +
+                 "Pixel: absolute pixels. Vh / Vw / Vmin / Vmax: percent of viewport.")]
         public float fontSize = 14f;
+
+        [Tooltip("How fontSize is interpreted. " +
+                 "Pixel: absolute pixels. Vmin: percent of the smaller viewport dimension.")]
+        public SizingMode sizingMode = SizingMode.Pixel;
 
         [Header("Display")]
         [Tooltip("Full: stretch to entire screen. Partial: native pixel size with alignment. " +
