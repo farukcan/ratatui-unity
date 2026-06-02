@@ -441,6 +441,22 @@ namespace UnityEngine
     {
         public ContextMenuAttribute(string name) { }
     }
+
+    public enum RuntimeInitializeLoadType
+    {
+        AfterSceneLoad,
+        BeforeSceneLoad,
+        AfterAssembliesLoaded,
+        BeforeSplashScreen,
+        SubsystemRegistration
+    }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public class RuntimeInitializeOnLoadMethodAttribute : Attribute
+    {
+        public RuntimeInitializeOnLoadMethodAttribute() { }
+        public RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType loadType) { }
+    }
 }
 
 namespace UnityEngine.UI
