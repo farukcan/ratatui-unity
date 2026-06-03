@@ -39,6 +39,13 @@ namespace RatatuiUnity.Samples.Console
         private int _filterCacheGeneration = -1;
         private Filter _filterCacheFilter = Filter.All;
         private string _filterCacheSearch = string.Empty;
+        // Incremental cache state: avoids re-scanning the entire ring on every
+        // Generation bump when only new entries have arrived (the common case
+        // under a log burst). _filterScanUpTo is the entry-count we've already
+        // considered; _lastTotalEvicted lets us shift stored positional indices
+        // down when the ring drops oldest entries between drains.
+        private int _filterScanUpTo;
+        private long _lastTotalEvicted;
 
         // Identity-stable selection: absolute index into Logs.Entries, not _visibleIndices.
         private int _selectedEntryIndex = -1;
@@ -104,7 +111,9 @@ namespace RatatuiUnity.Samples.Console
 
             // Always drain pending logs so the queue stays bounded even when the
             // console is closed for hours. The ring buffer applies its cap here.
-            RatatuiConsole.Logs?.DrainPending();
+            // Budget bounds the worst-case per-frame work so a log burst cannot
+            // stall the renderer; the remainder drains over subsequent frames.
+            RatatuiConsole.Logs?.DrainPending(ConsoleLogCapture.DefaultDrainBudget);
 
             if (_freshOpenFrames > 0) _freshOpenFrames--;
 
@@ -247,21 +256,15 @@ namespace RatatuiUnity.Samples.Console
 
         private void CountByKind(out int all, out int logs, out int warns, out int errs, out int excs)
         {
-            all = 0; logs = 0; warns = 0; errs = 0; excs = 0;
-            var entries = RatatuiConsole.Logs?.Entries;
-            if (entries == null) return;
-            all = entries.Count;
-            for (int i = 0; i < entries.Count; i++)
-            {
-                switch (entries[i].Kind)
-                {
-                    case ConsoleLogKind.Log: logs++; break;
-                    case ConsoleLogKind.Warning: warns++; break;
-                    case ConsoleLogKind.Error: errs++; break;
-                    case ConsoleLogKind.Assert: errs++; break;
-                    case ConsoleLogKind.Exception: excs++; break;
-                }
-            }
+            // Incremental counters are maintained by ConsoleLogCapture on every
+            // push / evict. Avoids an O(N) tally every header rebuild.
+            var capture = RatatuiConsole.Logs;
+            if (capture == null) { all = logs = warns = errs = excs = 0; return; }
+            logs = capture.LogCount;
+            warns = capture.WarningCount;
+            errs = capture.ErrorAndAssertCount;
+            excs = capture.ExceptionCount;
+            all = logs + warns + errs + excs;
         }
 
         private void DrawTab(RatatuiTerminal term, uint area, string label, Filter filter, Color activeColor)
@@ -406,6 +409,9 @@ namespace RatatuiUnity.Samples.Console
                         if (ts.Length > 0) sp.Span(ts, fg: ColorTimestamp, bg: rowBg);
                         sp.Span(tag, fg: tagColor, bg: rowBg, modifiers: Modifier.Bold);
                         sp.Span(lines[0], fg: msgColor, bg: rowBg);
+                        if (entry.Repeat > 1)
+                            sp.Span(" (×" + entry.Repeat + ")", fg: ColorPromptDim,
+                                bg: rowBg, modifiers: Modifier.Bold);
                     }
                     else
                     {
@@ -643,39 +649,97 @@ namespace RatatuiUnity.Samples.Console
 
         private void RebuildFilterCacheIfNeeded()
         {
-            int gen = RatatuiConsole.Logs?.Generation ?? 0;
+            var capture = RatatuiConsole.Logs;
+            int gen = capture?.Generation ?? 0;
             string search = _searchBuffer.Length > 0 ? _searchBuffer.ToString() : string.Empty;
-            if (gen == _filterCacheGeneration && _filter == _filterCacheFilter && search == _filterCacheSearch)
-                return;
 
-            _filterCacheGeneration = gen;
+            bool filterChanged = _filter != _filterCacheFilter || search != _filterCacheSearch;
+            if (gen == _filterCacheGeneration && !filterChanged) return;
+
             _filterCacheFilter = _filter;
             _filterCacheSearch = search;
-            _visibleIndices.Clear();
 
-            var entries = RatatuiConsole.Logs?.Entries;
-            if (entries == null) return;
-
-            bool selectedStillVisible = false;
-            for (int i = 0; i < entries.Count; i++)
+            var entries = capture?.Entries;
+            if (entries == null)
             {
-                if (!FilterAllows(_filter, entries[i].Kind)) continue;
-                if (search.Length > 0 &&
-                    entries[i].Message.IndexOf(search, System.StringComparison.OrdinalIgnoreCase) < 0)
-                    continue;
-                _visibleIndices.Add(i);
-                if (i == _selectedEntryIndex) selectedStillVisible = true;
-            }
-
-            // Identity-preserving selection: if the selected log no longer matches
-            // the current filter/search, drop the selection rather than silently
-            // re-mapping the slot to an unrelated entry.
-            if (!selectedStillVisible)
-            {
+                _visibleIndices.Clear();
+                _filterScanUpTo = 0;
+                _lastTotalEvicted = 0;
+                _filterCacheGeneration = gen;
                 _selectedEntryIndex = -1;
                 _detailOpen = false;
                 _detailScroll = 0;
+                return;
             }
+
+            long ev = capture.TotalEvicted;
+
+            if (filterChanged)
+            {
+                // Full rebuild — the active filter/search predicate changed, so
+                // previously-accepted indices may no longer qualify.
+                _visibleIndices.Clear();
+                bool selectedStillVisible = false;
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    if (!FilterAllows(_filter, entries[i].Kind)) continue;
+                    if (search.Length > 0 &&
+                        entries[i].Message.IndexOf(search, System.StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+                    _visibleIndices.Add(i);
+                    if (i == _selectedEntryIndex) selectedStillVisible = true;
+                }
+                _filterScanUpTo = entries.Count;
+                if (!selectedStillVisible)
+                {
+                    _selectedEntryIndex = -1;
+                    _detailOpen = false;
+                    _detailScroll = 0;
+                }
+            }
+            else
+            {
+                // Incremental: filter/search unchanged, generation bumped. Shift
+                // stored positional indices for any evictions, then scan only the
+                // newly-appended tail of the ring.
+                int evictedDelta = (int)(ev - _lastTotalEvicted);
+                if (evictedDelta > 0)
+                {
+                    int write = 0;
+                    for (int r = 0; r < _visibleIndices.Count; r++)
+                    {
+                        int v = _visibleIndices[r] - evictedDelta;
+                        if (v >= 0) _visibleIndices[write++] = v;
+                    }
+                    if (write < _visibleIndices.Count)
+                        _visibleIndices.RemoveRange(write, _visibleIndices.Count - write);
+                    _filterScanUpTo = Mathf.Max(0, _filterScanUpTo - evictedDelta);
+
+                    if (_selectedEntryIndex >= 0)
+                    {
+                        _selectedEntryIndex -= evictedDelta;
+                        if (_selectedEntryIndex < 0)
+                        {
+                            _selectedEntryIndex = -1;
+                            _detailOpen = false;
+                            _detailScroll = 0;
+                        }
+                    }
+                }
+
+                for (int i = _filterScanUpTo; i < entries.Count; i++)
+                {
+                    if (!FilterAllows(_filter, entries[i].Kind)) continue;
+                    if (search.Length > 0 &&
+                        entries[i].Message.IndexOf(search, System.StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+                    _visibleIndices.Add(i);
+                }
+                _filterScanUpTo = entries.Count;
+            }
+
+            _lastTotalEvicted = ev;
+            _filterCacheGeneration = gen;
         }
 
         private static bool FilterAllows(Filter filter, ConsoleLogKind kind)
