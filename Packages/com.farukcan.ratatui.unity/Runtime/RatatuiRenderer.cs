@@ -79,9 +79,6 @@ namespace RatatuiUnity
         [Tooltip("Vertical placement when OnGUI mode is Partial.")]
         [SerializeField] private OnGuiVerticalAlign _onGuiVerticalAlign = OnGuiVerticalAlign.Center;
 
-        [Tooltip("Height of the title bar in pixels (Window mode only).")]
-        [SerializeField] private float _windowTitleBarHeight = 24f;
-
         [Tooltip("Title bar background color when this window is NOT focused (Window mode only).")]
         [SerializeField] private Color _windowTitleBarColor = new Color(0.09f, 0.09f, 0.09f);
 
@@ -113,7 +110,7 @@ namespace RatatuiUnity
         [Header("Performance")]
         [Tooltip("Maximum terminal render FPS. 0 = unlimited (renders every Unity frame). " +
                  "Lower values reduce CPU/GPU cost. Hash-based dirty check still applies.")]
-        [SerializeField] private int _maxRenderFps;
+        [SerializeField] private int _maxRenderFps = 60;
 
         // ── Public Properties ─────────────────────────────────────────────────
 
@@ -262,28 +259,39 @@ namespace RatatuiUnity
         // Cached textures for tinted GUI fills (lazy init)
         private static Texture2D _windowFillTexture;
         private static Texture2D _windowCircleTexture;
+        private static Texture2D _windowRoundedRectTexture;
         private GUIStyle _windowTitleStyle;
         private GUIStyle _windowZoomGlyphStyle;
 
         // macOS traffic-light colors (close is permanently disabled → dim variant only)
-        private static readonly Color WindowMinimizeColor      = new Color(0.996f, 0.737f, 0.180f);
-        private static readonly Color WindowFullscreenColor    = new Color(0.157f, 0.784f, 0.251f);
-        private static readonly Color WindowTitleTextColor     = new Color(0.85f, 0.85f, 0.87f);
+        private static readonly Color WindowMinimizeColor = new Color(0.996f, 0.737f, 0.180f);
+        private static readonly Color WindowFullscreenColor = new Color(0.157f, 0.784f, 0.251f);
+        private static readonly Color WindowTitleTextColor = new Color(0.85f, 0.85f, 0.87f);
         private static readonly Color WindowCloseDisabledColor = new Color(0.5f, 0.186f, 0.170f);
 
         // Right-side zoom + resize controls (uniform blue; resize dimmed while maximized)
-        private static readonly Color WindowControlBlueColor     = new Color(0.247f, 0.663f, 0.961f);
-        private static readonly Color WindowZoomDisabledTint   = new Color(1f, 1f, 1f, 0.35f);
+        private static readonly Color WindowControlBlueColor = new Color(0.10f, 0.36f, 0.68f);
+
+        private static readonly Color WindowZoomDisabledTint = new Color(1f, 1f, 1f, 0.35f);
 
         // Window chrome layout constants
-        private const float WindowButtonSize    = 12f;
+        // Title bar height, title font size and traffic-light button size are all
+        // derived from min(Screen.width, Screen.height) * WindowVMinPercent so the
+        // chrome scales with the viewport (vmin units, CSS-style).
+        private const float WindowVMinPercent = 0.0175f;
+        private const float WindowTitleBarFactor = 1.6f;   // titlebar = vmin * factor → padding around buttons
         private const float WindowButtonPadding = 8f;
         private const float WindowButtonSpacing = 8f;
-        private const float WindowMinVisible    = 80f;
-        private const float WindowZoomStep      = 1.10f;
-        private const float WindowFontSizeMin   = 1f;
-        private const float WindowFontSizeMax   = 200f;
-        private const float WindowResizeMargin  = 3f;
+        private const float WindowMinVisible = 80f;
+        private const float WindowZoomStep = 1.10f;
+        private const float WindowFontSizeMin = 1f;
+        private const float WindowFontSizeMax = 200f;
+        private const float WindowResizeMargin = 3f;
+
+        private static float WindowVMin => Mathf.Min(Screen.width, Screen.height) * WindowVMinPercent;
+        private static float WindowTitleBarHeight => WindowVMin * WindowTitleBarFactor;
+        private static float WindowButtonSize => WindowVMin;
+        private static int WindowTitleFontSize => Mathf.Max(1, Mathf.RoundToInt(WindowVMin));
 
         // Non-character keys polled with GetKeyDown each frame
         private static readonly KeyCode[] TrackedKeys =
@@ -404,11 +412,12 @@ namespace RatatuiUnity
                 DrawWindowChrome();
                 if (!_isMinimized)
                 {
+                    float titleBarH = WindowTitleBarHeight;
                     Rect contentRect = new Rect(
                         _windowRect.x,
-                        _windowRect.y + _windowTitleBarHeight,
+                        _windowRect.y + titleBarH,
                         _windowRect.width,
-                        _windowRect.height - _windowTitleBarHeight);
+                        _windowRect.height - titleBarH);
                     GUI.DrawTextureWithTexCoords(
                         contentRect, Texture, new Rect(0f, 1f, 1f, -1f), false);
                 }
@@ -780,7 +789,7 @@ namespace RatatuiUnity
         {
             switch (_onGuiMode)
             {
-                case OnGuiMode.Window:  return 2;
+                case OnGuiMode.Window: return 2;
                 case OnGuiMode.Partial: return 1;
                 default: /* Full */     return 0;
             }
@@ -831,7 +840,7 @@ namespace RatatuiUnity
                 {
                     var bar = new Rect(
                         _windowRect.x, _windowRect.y,
-                        _windowRect.width, _windowTitleBarHeight);
+                        _windowRect.width, WindowTitleBarHeight);
                     return bar.Contains(guiPoint);
                 }
                 return _windowRect.Contains(guiPoint);
@@ -948,11 +957,12 @@ namespace RatatuiUnity
                 // Terminal hit-testing uses _onGuiRect, so expose the content area
                 // (window rect minus title bar). Mouse over the title bar falls outside,
                 // so terminal mouse events do not fire while interacting with chrome.
+                float titleBarH = WindowTitleBarHeight;
                 _onGuiRect = new Rect(
                     _windowRect.x,
-                    _windowRect.y + _windowTitleBarHeight,
+                    _windowRect.y + titleBarH,
                     _windowRect.width,
-                    _windowRect.height - _windowTitleBarHeight);
+                    _windowRect.height - titleBarH);
                 return;
             }
 
@@ -961,16 +971,16 @@ namespace RatatuiUnity
 
             float x = _onGuiHorizontalAlign switch
             {
-                OnGuiHorizontalAlign.Left   => 0f,
-                OnGuiHorizontalAlign.Right  => Screen.width - w,
-                _                           => (Screen.width - w) * 0.5f,
+                OnGuiHorizontalAlign.Left => 0f,
+                OnGuiHorizontalAlign.Right => Screen.width - w,
+                _ => (Screen.width - w) * 0.5f,
             };
 
             float y = _onGuiVerticalAlign switch
             {
-                OnGuiVerticalAlign.Top    => 0f,
+                OnGuiVerticalAlign.Top => 0f,
                 OnGuiVerticalAlign.Bottom => Screen.height - h,
-                _                         => (Screen.height - h) * 0.5f,
+                _ => (Screen.height - h) * 0.5f,
             };
 
             _onGuiRect = new Rect(x, y, w, h);
@@ -983,8 +993,8 @@ namespace RatatuiUnity
             if (_windowInitialized || Texture == null) return;
 
             float w = Texture.width;
-            float h = Texture.height + _windowTitleBarHeight;
-            float x = _windowInitialX < 0f ? (Screen.width  - w) * 0.5f : _windowInitialX;
+            float h = Texture.height + WindowTitleBarHeight;
+            float x = _windowInitialX < 0f ? (Screen.width - w) * 0.5f : _windowInitialX;
             float y = _windowInitialY < 0f ? (Screen.height - h) * 0.5f : _windowInitialY;
             _windowRect = new Rect(x, y, w, h);
             _windowInitialized = true;
@@ -1049,6 +1059,46 @@ namespace RatatuiUnity
             GUI.color = prev;
         }
 
+        private static Texture2D GetRoundedRectTexture()
+        {
+            if (_windowRoundedRectTexture != null) return _windowRoundedRectTexture;
+
+            // Square SDF for a rounded rect. Buttons that use this are square, so
+            // StretchToFill keeps corner curvature uniform without 9-slicing.
+            const int size = 64;
+            const float radius = 14f;   // ~22% of size — subtle iOS-style rounding
+            _windowRoundedRectTexture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    // Distance from pixel to the inner rect (shrunk by `radius`).
+                    // Inside the inner rect → dist=0 → fully opaque.
+                    // Beyond it → dist measures how far into the corner zone we are.
+                    float dx = Mathf.Max(radius - x, x - (size - 1 - radius), 0f);
+                    float dy = Mathf.Max(radius - y, y - (size - 1 - radius), 0f);
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01(radius - dist + 0.5f);
+                    _windowRoundedRectTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            _windowRoundedRectTexture.Apply();
+            return _windowRoundedRectTexture;
+        }
+
+        private static void FillRoundedRect(Rect rect, Color color)
+        {
+            Color prev = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, GetRoundedRectTexture(), ScaleMode.StretchToFill, true);
+            GUI.color = prev;
+        }
+
         private GUIStyle GetWindowTitleStyle()
         {
             if (_windowTitleStyle == null)
@@ -1056,12 +1106,13 @@ namespace RatatuiUnity
                 _windowTitleStyle = new GUIStyle(GUI.skin.label)
                 {
                     alignment = TextAnchor.MiddleCenter,
-                    fontSize = 12,
                     clipping = TextClipping.Clip,
                     wordWrap = false,
                 };
                 _windowTitleStyle.normal.textColor = WindowTitleTextColor;
             }
+            // Refresh on every call so screen resizes update the title size.
+            _windowTitleStyle.fontSize = WindowTitleFontSize;
             return _windowTitleStyle;
         }
 
@@ -1073,45 +1124,42 @@ namespace RatatuiUnity
         private void DrawWindowChrome()
         {
             // Title bar background
+            float titleBarH = WindowTitleBarHeight;
             Rect titleBarRect = new Rect(
                 _windowRect.x, _windowRect.y,
-                _windowRect.width, _windowTitleBarHeight);
+                _windowRect.width, titleBarH);
             FillRect(titleBarRect, IsFocused ? _windowTitleBarColorFocused : _windowTitleBarColor);
             DrawWindowTitle(titleBarRect);
 
-            // Shared enlarged hit-box size — same square as the resize handle.
-            // Visuals stay at WindowButtonSize, but click/drag-suppression areas
-            // are this size, centered on each circle.
-            float hitSize = _windowTitleBarHeight - 2f * WindowResizeMargin;
-            float hitY    = _windowRect.y + WindowResizeMargin;
-
-            // Traffic-light buttons (left side, vertically centered)
-            float btnY = _windowRect.y + (_windowTitleBarHeight - WindowButtonSize) * 0.5f;
+            // Uniform button size for both left traffic-lights and right square controls,
+            // vertically centered in the (taller) title bar.
+            float btnSize = WindowButtonSize;
+            float btnY = _windowRect.y + (titleBarH - btnSize) * 0.5f;
             float btnX = _windowRect.x + WindowButtonPadding;
 
-            Rect closeRect      = new Rect(btnX, btnY, WindowButtonSize, WindowButtonSize);
-            Rect minimizeRect   = new Rect(btnX + (WindowButtonSize + WindowButtonSpacing),
-                                           btnY, WindowButtonSize, WindowButtonSize);
-            Rect fullscreenRect = new Rect(btnX + (WindowButtonSize + WindowButtonSpacing) * 2f,
-                                           btnY, WindowButtonSize, WindowButtonSize);
+            Rect closeRect = new Rect(btnX, btnY, btnSize, btnSize);
+            Rect minimizeRect = new Rect(btnX + (btnSize + WindowButtonSpacing),
+                                           btnY, btnSize, btnSize);
+            Rect fullscreenRect = new Rect(btnX + (btnSize + WindowButtonSpacing) * 2f,
+                                           btnY, btnSize, btnSize);
 
-            Rect closeHit      = new Rect(closeRect.center.x      - hitSize * 0.5f, hitY, hitSize, hitSize);
-            Rect minimizeHit   = new Rect(minimizeRect.center.x   - hitSize * 0.5f, hitY, hitSize, hitSize);
-            Rect fullscreenHit = new Rect(fullscreenRect.center.x - hitSize * 0.5f, hitY, hitSize, hitSize);
+            Rect closeHit = closeRect;
+            Rect minimizeHit = minimizeRect;
+            Rect fullscreenHit = fullscreenRect;
 
             // Close: disabled, visually dim — no click handling
             FillCircle(closeRect, WindowCloseDisabledColor);
 
-            // Right-side controls (all squares, same size as the resize handle).
+            // Right-side controls (all squares, same size as the traffic-lights).
             // Laid out from the far-right corner inward:
             //   [resize handle] [−] [+]
-            float resizeX    = _windowRect.x + _windowRect.width - WindowResizeMargin - hitSize;
-            float zoomMinusX = resizeX    - WindowButtonSpacing - hitSize;
-            float zoomPlusX  = zoomMinusX - WindowButtonSpacing - hitSize;
+            float resizeX = _windowRect.x + _windowRect.width - WindowResizeMargin - btnSize;
+            float zoomMinusX = resizeX - WindowButtonSpacing - btnSize;
+            float zoomPlusX = zoomMinusX - WindowButtonSpacing - btnSize;
 
-            Rect resizeHandleRect = new Rect(resizeX,    hitY, hitSize, hitSize);
-            Rect zoomMinusRect    = new Rect(zoomMinusX, hitY, hitSize, hitSize);
-            Rect zoomPlusRect     = new Rect(zoomPlusX,  hitY, hitSize, hitSize);
+            Rect resizeHandleRect = new Rect(resizeX, btnY, btnSize, btnSize);
+            Rect zoomMinusRect = new Rect(zoomMinusX, btnY, btnSize, btnSize);
+            Rect zoomPlusRect = new Rect(zoomPlusX, btnY, btnSize, btnSize);
 
             HandleWindowResize(resizeHandleRect);
             HandleWindowDrag(titleBarRect, closeHit, minimizeHit, fullscreenHit,
@@ -1137,10 +1185,10 @@ namespace RatatuiUnity
                 Event.current.Use();
             }
 
-            // Zoom: blue squares (sized like the resize handle). Active in all states (incl. maximized).
-            FillRect(zoomPlusRect,  WindowControlBlueColor);
-            FillRect(zoomMinusRect, WindowControlBlueColor);
-            DrawZoomGlyph(zoomPlusRect,  "+");
+            // Zoom: blue rounded squares (sized like the resize handle). Active in all states (incl. maximized).
+            FillRoundedRect(zoomPlusRect, WindowControlBlueColor);
+            FillRoundedRect(zoomMinusRect, WindowControlBlueColor);
+            DrawZoomGlyph(zoomPlusRect, "+");
             DrawZoomGlyph(zoomMinusRect, "−");
 
             if (Event.current.type == EventType.MouseDown
@@ -1158,12 +1206,12 @@ namespace RatatuiUnity
                 }
             }
 
-            // Resize handle: blue square with ✴︎ glyph, far-right. Dimmed while maximized.
+            // Resize handle: blue rounded square with ◥ glyph, far-right. Dimmed while maximized.
             Color handleColor = _isMaximized
                 ? WindowControlBlueColor * WindowZoomDisabledTint
                 : WindowControlBlueColor;
-            FillRect(resizeHandleRect, handleColor);
-            DrawZoomGlyph(resizeHandleRect, "✴︎");
+            FillRoundedRect(resizeHandleRect, handleColor);
+            DrawZoomGlyph(resizeHandleRect, "◥");
         }
 
         private void ToggleMaximized()
@@ -1237,9 +1285,9 @@ namespace RatatuiUnity
         // Keep at least WindowMinVisible of the title bar reachable so drag + zoom stay usable.
         private void ClampWindowPositionOnScreen()
         {
-            float maxX = Screen.width  - WindowMinVisible;
+            float maxX = Screen.width - WindowMinVisible;
             float minX = WindowMinVisible - _windowRect.width;
-            float maxY = Screen.height - _windowTitleBarHeight;
+            float maxY = Screen.height - WindowTitleBarHeight;
             float minY = 0f;
             _windowRect.x = Mathf.Clamp(_windowRect.x, minX, maxX);
             _windowRect.y = Mathf.Clamp(_windowRect.y, minY, maxY);
@@ -1278,16 +1326,17 @@ namespace RatatuiUnity
                     float dx = mouse.x - _resizeStartMouse.x;
                     float dy = mouse.y - _resizeStartMouse.y;
 
-                    // Min width must fit: left traffic-lights + right (zoom pair + resize handle, all square hitSize).
-                    float hitSize = _windowTitleBarHeight - 2f * WindowResizeMargin;
-                    float minWidth = WindowButtonPadding + 3f * WindowButtonSize + 2f * WindowButtonSpacing  // left chrome
-                                     + 3f * hitSize + 2f * WindowButtonSpacing                              // right squares
-                                     + WindowResizeMargin;                                                  // far-right margin
+                    // Min width must fit: left traffic-lights + right (zoom pair + resize handle).
+                    // All buttons share WindowButtonSize.
+                    float btnSize = WindowButtonSize;
+                    float minWidth = WindowButtonPadding + 3f * btnSize + 2f * WindowButtonSpacing  // left chrome
+                                     + 3f * btnSize + 2f * WindowButtonSpacing                      // right squares
+                                     + WindowResizeMargin;                                          // far-right margin
                     // Min height: titlebar + a sliver of content (reuse WindowMinVisible).
-                    float minHeight = _windowTitleBarHeight + WindowMinVisible;
+                    float minHeight = WindowTitleBarHeight + WindowMinVisible;
 
                     float bottomY = _resizeStartWindowRect.y + _resizeStartWindowRect.height;
-                    float maxWidth  = Screen.width;
+                    float maxWidth = Screen.width;
                     // Top edge cannot leave the screen — height capped so newY >= 0.
                     // Floor at minHeight so Mathf.Clamp's invariant (min <= max) holds
                     // even when the window starts partly off-screen (bottomY < minHeight).
@@ -1295,13 +1344,13 @@ namespace RatatuiUnity
 
                     // Mouse moving right (dx>0) grows width (left edge pinned, right edge follows mouse).
                     // Mouse moving down  (dy>0) shrinks height (bottom edge pinned, top edge follows mouse).
-                    float newWidth  = Mathf.Clamp(_resizeStartWindowRect.width  + dx, minWidth,  maxWidth);
+                    float newWidth = Mathf.Clamp(_resizeStartWindowRect.width + dx, minWidth, maxWidth);
                     float newHeight = Mathf.Clamp(_resizeStartWindowRect.height - dy, minHeight, maxHeight);
 
-                    _windowRect.x      = _resizeStartWindowRect.x;       // left edge pinned
-                    _windowRect.width  = newWidth;
+                    _windowRect.x = _resizeStartWindowRect.x;       // left edge pinned
+                    _windowRect.width = newWidth;
                     _windowRect.height = newHeight;
-                    _windowRect.y      = bottomY - newHeight;            // bottom edge pinned
+                    _windowRect.y = bottomY - newHeight;            // bottom edge pinned
                     ClampWindowPositionOnScreen();
                     e.Use();
                     break;
@@ -1344,13 +1393,14 @@ namespace RatatuiUnity
                 _windowZoomGlyphStyle = new GUIStyle(GUI.skin.label)
                 {
                     alignment = TextAnchor.MiddleCenter,
-                    fontSize = 14,
                     fontStyle = FontStyle.Bold,
                     clipping = TextClipping.Clip,
                     wordWrap = false,
                 };
                 _windowZoomGlyphStyle.normal.textColor = WindowTitleTextColor;
             }
+            // Glyph nearly fills the button — refresh every call so screen resizes track.
+            _windowZoomGlyphStyle.fontSize = Mathf.Max(1, Mathf.RoundToInt(WindowButtonSize * 0.9f));
             return _windowZoomGlyphStyle;
         }
 
@@ -1512,11 +1562,11 @@ namespace RatatuiUnity
             GetTargetPixelRect(out float width, out float height, fontSizeViewport: true);
             float basis = _sizingMode switch
             {
-                SizingMode.Vh   => height,
-                SizingMode.Vw   => width,
+                SizingMode.Vh => height,
+                SizingMode.Vw => width,
                 SizingMode.Vmin => Mathf.Min(width, height),
                 SizingMode.Vmax => Mathf.Max(width, height),
-                _               => 0f,
+                _ => 0f,
             };
             float fontSize = _fontSize * basis / 100f;
             return Mathf.Max(1f, fontSize);
@@ -1554,19 +1604,19 @@ namespace RatatuiUnity
                 if (useScreen)
                 {
                     width = Screen.width;
-                    height = Mathf.Max(1f, Screen.height - _windowTitleBarHeight);
+                    height = Mathf.Max(1f, Screen.height - WindowTitleBarHeight);
                     return;
                 }
                 if (_windowInitialized)
                 {
                     width = _windowRect.width;
-                    height = Mathf.Max(1f, _windowRect.height - _windowTitleBarHeight);
+                    height = Mathf.Max(1f, _windowRect.height - WindowTitleBarHeight);
                     return;
                 }
                 // First call before EnsureWindowInitialized — use a sane initial size
                 // (~70% of screen) so the very first auto fontSize lands somewhere usable.
                 width = Screen.width * 0.7f;
-                height = Mathf.Max(1f, Screen.height * 0.7f - _windowTitleBarHeight);
+                height = Mathf.Max(1f, Screen.height * 0.7f - WindowTitleBarHeight);
                 return;
             }
 
@@ -1588,7 +1638,7 @@ namespace RatatuiUnity
             if (Terminal == null) return;
 
             float w = Terminal.PixelWidth;
-            float h = Terminal.PixelHeight + _windowTitleBarHeight;
+            float h = Terminal.PixelHeight + WindowTitleBarHeight;
 
             if (!_windowInitialized)
             {

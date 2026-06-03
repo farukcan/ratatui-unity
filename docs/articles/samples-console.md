@@ -9,7 +9,7 @@
 - Toggle with **`` ` ``** (backtick) by default
 - Built-in commands: `help`, `clear`, `quit`, `echo`, `version`, `fps`, `scene`, `time_scale`, `target_fps`, `sysinfo`, `pause`, `resume`, `gc`, `log_warning`, `log_error`, `log_exception`
 - Command history (Up/Down arrows), scrollback, log timestamps
-- **Window mode** (default): draggable macOS-style frame with title-bar **zoom** (`+` / `−`, ~10% per click) and **resize** (drag the blue `✴︎` handle) — inherited from `RatatuiRenderer`; see [Resolution & Readability → OnGUI Window Mode](resolution-and-readability.md#ongui-window-mode)
+- **Window mode** (default): draggable macOS-style frame with title-bar **zoom** (`+` / `−`, ~10% per click) and **resize** (drag the blue `◥` handle) — inherited from `RatatuiRenderer`; see [Resolution & Readability → OnGUI Window Mode](resolution-and-readability.md#ongui-window-mode)
 
 ## Boot Flow
 
@@ -114,7 +114,7 @@ With the default `displayMode` of `Window`:
 
 1. Open the console (`` ` `` by default).
 2. Use the blue **+** / **−** buttons on the title bar to zoom glyph size in or out (~10% per click, clamped to 1–200 in the active sizing units).
-3. Drag the blue **✴︎ resize handle** (far right) to change how much screen area the window occupies without changing glyph scale; the column/row count adapts on release.
+3. Drag the blue **◥ resize handle** (far right) to change how much screen area the window occupies without changing glyph scale; the column/row count adapts on release.
 
 Zoom works even when the window is maximized (green traffic-light). Resize is disabled while maximized. Initial `fontSize` and `sizingMode` from the config asset set the starting scale; zoom adjusts from there for the session (not persisted back to the asset).
 
