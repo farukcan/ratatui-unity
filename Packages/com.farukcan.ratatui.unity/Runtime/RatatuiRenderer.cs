@@ -233,6 +233,13 @@ namespace RatatuiUnity
         private bool _isMinimized;
         private bool _isMaximized;
 
+        // Drag-resize from the titlebar's top-right square handle.
+        // Pivot is the window's bottom-left corner: left edge and bottom edge stay
+        // fixed; the handle pulls the right and top edges independently.
+        private bool _isResizing;
+        private Vector2 _resizeStartMouse;
+        private Rect _resizeStartWindowRect;
+
         // Resize / readability state
         // Cached custom font bytes so resize-driven Terminal recreation can re-apply
         // the user's font instead of falling back to the embedded JetBrains Mono.
@@ -256,6 +263,7 @@ namespace RatatuiUnity
         private static Texture2D _windowFillTexture;
         private static Texture2D _windowCircleTexture;
         private GUIStyle _windowTitleStyle;
+        private GUIStyle _windowZoomGlyphStyle;
 
         // macOS traffic-light colors (close is permanently disabled → dim variant only)
         private static readonly Color WindowMinimizeColor      = new Color(0.996f, 0.737f, 0.180f);
@@ -263,11 +271,19 @@ namespace RatatuiUnity
         private static readonly Color WindowTitleTextColor     = new Color(0.85f, 0.85f, 0.87f);
         private static readonly Color WindowCloseDisabledColor = new Color(0.5f, 0.186f, 0.170f);
 
+        // Right-side zoom + resize controls (uniform blue; resize dimmed while maximized)
+        private static readonly Color WindowControlBlueColor     = new Color(0.247f, 0.663f, 0.961f);
+        private static readonly Color WindowZoomDisabledTint   = new Color(1f, 1f, 1f, 0.35f);
+
         // Window chrome layout constants
         private const float WindowButtonSize    = 12f;
         private const float WindowButtonPadding = 8f;
         private const float WindowButtonSpacing = 8f;
         private const float WindowMinVisible    = 80f;
+        private const float WindowZoomStep      = 1.10f;
+        private const float WindowFontSizeMin   = 1f;
+        private const float WindowFontSizeMax   = 200f;
+        private const float WindowResizeMargin  = 3f;
 
         // Non-character keys polled with GetKeyDown each frame
         private static readonly KeyCode[] TrackedKeys =
@@ -321,10 +337,16 @@ namespace RatatuiUnity
         protected virtual void Update()
         {
             // Reactive refit: poll Screen metrics + drain RectTransform dirty flag.
-            // Both feed the same ReinitializeTerminal() path. Pixel mode opts out
-            // (absolute fontSize, no viewport tracking).
+            // Both feed the same ReinitializeTerminal() path. Pixel mode skips
+            // polling (absolute fontSize, no viewport tracking) but still drains
+            // an explicitly-set dirty flag so font-zoom clicks refit the terminal.
             if (_sizingMode != SizingMode.Pixel)
                 CheckForResize();
+            else if (_resizeDirty)
+            {
+                _resizeDirty = false;
+                ReinitializeTerminal(firstTime: false);
+            }
 
             // Update OnGUI rect before input so mouse coordinates are correct
             if (_rawImage == null && _meshRenderer == null)
@@ -1057,6 +1079,12 @@ namespace RatatuiUnity
             FillRect(titleBarRect, IsFocused ? _windowTitleBarColorFocused : _windowTitleBarColor);
             DrawWindowTitle(titleBarRect);
 
+            // Shared enlarged hit-box size — same square as the resize handle.
+            // Visuals stay at WindowButtonSize, but click/drag-suppression areas
+            // are this size, centered on each circle.
+            float hitSize = _windowTitleBarHeight - 2f * WindowResizeMargin;
+            float hitY    = _windowRect.y + WindowResizeMargin;
+
             // Traffic-light buttons (left side, vertically centered)
             float btnY = _windowRect.y + (_windowTitleBarHeight - WindowButtonSize) * 0.5f;
             float btnX = _windowRect.x + WindowButtonPadding;
@@ -1067,16 +1095,33 @@ namespace RatatuiUnity
             Rect fullscreenRect = new Rect(btnX + (WindowButtonSize + WindowButtonSpacing) * 2f,
                                            btnY, WindowButtonSize, WindowButtonSize);
 
+            Rect closeHit      = new Rect(closeRect.center.x      - hitSize * 0.5f, hitY, hitSize, hitSize);
+            Rect minimizeHit   = new Rect(minimizeRect.center.x   - hitSize * 0.5f, hitY, hitSize, hitSize);
+            Rect fullscreenHit = new Rect(fullscreenRect.center.x - hitSize * 0.5f, hitY, hitSize, hitSize);
+
             // Close: disabled, visually dim — no click handling
             FillCircle(closeRect, WindowCloseDisabledColor);
 
-            HandleWindowDrag(titleBarRect, closeRect, minimizeRect, fullscreenRect);
+            // Right-side controls (all squares, same size as the resize handle).
+            // Laid out from the far-right corner inward:
+            //   [resize handle] [−] [+]
+            float resizeX    = _windowRect.x + _windowRect.width - WindowResizeMargin - hitSize;
+            float zoomMinusX = resizeX    - WindowButtonSpacing - hitSize;
+            float zoomPlusX  = zoomMinusX - WindowButtonSpacing - hitSize;
+
+            Rect resizeHandleRect = new Rect(resizeX,    hitY, hitSize, hitSize);
+            Rect zoomMinusRect    = new Rect(zoomMinusX, hitY, hitSize, hitSize);
+            Rect zoomPlusRect     = new Rect(zoomPlusX,  hitY, hitSize, hitSize);
+
+            HandleWindowResize(resizeHandleRect);
+            HandleWindowDrag(titleBarRect, closeHit, minimizeHit, fullscreenHit,
+                             zoomPlusRect, zoomMinusRect, resizeHandleRect);
 
             // Minimize: yellow toggle
             FillCircle(minimizeRect, WindowMinimizeColor);
             if (Event.current.type == EventType.MouseDown
                 && Event.current.button == 0
-                && minimizeRect.Contains(Event.current.mousePosition))
+                && minimizeHit.Contains(Event.current.mousePosition))
             {
                 _isMinimized = !_isMinimized;
                 Event.current.Use();
@@ -1086,11 +1131,39 @@ namespace RatatuiUnity
             FillCircle(fullscreenRect, WindowFullscreenColor);
             if (Event.current.type == EventType.MouseDown
                 && Event.current.button == 0
-                && fullscreenRect.Contains(Event.current.mousePosition))
+                && fullscreenHit.Contains(Event.current.mousePosition))
             {
                 ToggleMaximized();
                 Event.current.Use();
             }
+
+            // Zoom: blue squares (sized like the resize handle). Active in all states (incl. maximized).
+            FillRect(zoomPlusRect,  WindowControlBlueColor);
+            FillRect(zoomMinusRect, WindowControlBlueColor);
+            DrawZoomGlyph(zoomPlusRect,  "+");
+            DrawZoomGlyph(zoomMinusRect, "−");
+
+            if (Event.current.type == EventType.MouseDown
+                && Event.current.button == 0)
+            {
+                if (zoomPlusRect.Contains(Event.current.mousePosition))
+                {
+                    ApplyFontZoom(WindowZoomStep);
+                    Event.current.Use();
+                }
+                else if (zoomMinusRect.Contains(Event.current.mousePosition))
+                {
+                    ApplyFontZoom(1f / WindowZoomStep);
+                    Event.current.Use();
+                }
+            }
+
+            // Resize handle: blue square with ∗ glyph, far-right. Dimmed while maximized.
+            Color handleColor = _isMaximized
+                ? WindowControlBlueColor * WindowZoomDisabledTint
+                : WindowControlBlueColor;
+            FillRect(resizeHandleRect, handleColor);
+            DrawZoomGlyph(resizeHandleRect, "∗");
         }
 
         private void ToggleMaximized()
@@ -1114,10 +1187,13 @@ namespace RatatuiUnity
                 _resizeDirty = true;
         }
 
-        private void HandleWindowDrag(Rect titleBarRect, Rect closeRect, Rect minimizeRect, Rect fullscreenRect)
+        private void HandleWindowDrag(Rect titleBarRect, Rect closeHit, Rect minimizeHit, Rect fullscreenHit,
+                                      Rect zoomPlusRect, Rect zoomMinusRect, Rect resizeHandleRect)
         {
             // Disable drag while maximized — restoring via fullscreen toggle keeps semantics simple.
             if (_isMaximized) return;
+            // Resize already owns the event flow — don't compete for the same gesture.
+            if (_isResizing) return;
 
             Event e = Event.current;
             Vector2 mouse = e.mousePosition;
@@ -1129,9 +1205,12 @@ namespace RatatuiUnity
                     if (!titleBarRect.Contains(mouse)) return;
                     // Title bar click (anywhere, including the traffic-light buttons) focuses the window.
                     if (!IsFocused) RatatuiFocusManager.SetFocus(this);
-                    if (closeRect.Contains(mouse)
-                        || minimizeRect.Contains(mouse)
-                        || fullscreenRect.Contains(mouse)) return;
+                    if (closeHit.Contains(mouse)
+                        || minimizeHit.Contains(mouse)
+                        || fullscreenHit.Contains(mouse)
+                        || zoomPlusRect.Contains(mouse)
+                        || zoomMinusRect.Contains(mouse)
+                        || resizeHandleRect.Contains(mouse)) return;
                     _isDragging = true;
                     _dragStartMouse = mouse;
                     _dragStartWindowPos = _windowRect.position;
@@ -1140,15 +1219,8 @@ namespace RatatuiUnity
 
                 case EventType.MouseDrag:
                     if (!_isDragging) return;
-                    Vector2 newPos = _dragStartWindowPos + (mouse - _dragStartMouse);
-                    // Keep at least WindowMinVisible of the title bar visible on screen.
-                    float maxX = Screen.width  - WindowMinVisible;
-                    float minX = WindowMinVisible - _windowRect.width;
-                    float maxY = Screen.height - _windowTitleBarHeight;
-                    float minY = 0f;
-                    newPos.x = Mathf.Clamp(newPos.x, minX, maxX);
-                    newPos.y = Mathf.Clamp(newPos.y, minY, maxY);
-                    _windowRect.position = newPos;
+                    _windowRect.position = _dragStartWindowPos + (mouse - _dragStartMouse);
+                    ClampWindowPositionOnScreen();
                     e.Use();
                     break;
 
@@ -1160,6 +1232,126 @@ namespace RatatuiUnity
                     }
                     break;
             }
+        }
+
+        // Keep at least WindowMinVisible of the title bar reachable so drag + zoom stay usable.
+        private void ClampWindowPositionOnScreen()
+        {
+            float maxX = Screen.width  - WindowMinVisible;
+            float minX = WindowMinVisible - _windowRect.width;
+            float maxY = Screen.height - _windowTitleBarHeight;
+            float minY = 0f;
+            _windowRect.x = Mathf.Clamp(_windowRect.x, minX, maxX);
+            _windowRect.y = Mathf.Clamp(_windowRect.y, minY, maxY);
+        }
+
+        // Drag-resize from the titlebar's top-right square handle. Bottom-left
+        // pivot: left edge and bottom edge stay anchored; the right and top
+        // edges follow the mouse independently (no aspect lock), so the handle
+        // tracks the cursor naturally during the drag. fontSize is untouched;
+        // the existing refit pipeline (CalculateColsAndRows when _fitColsAndRows=true)
+        // re-derives the grid for the new content area on mouse-up.
+        // NOTE: this differs from SyncWindowRectToTexture's top-right pivot —
+        // refits (zoom/maximize-restore) keep the right edge fixed so the
+        // right-side controls don't jump; manual drag-resize follows the cursor.
+        private void HandleWindowResize(Rect handleRect)
+        {
+            if (_isMaximized) return;
+
+            Event e = Event.current;
+            Vector2 mouse = e.mousePosition;
+
+            switch (e.type)
+            {
+                case EventType.MouseDown:
+                    if (e.button != 0) return;
+                    if (!handleRect.Contains(mouse)) return;
+                    if (!IsFocused) RatatuiFocusManager.SetFocus(this);
+                    _isResizing = true;
+                    _resizeStartMouse = mouse;
+                    _resizeStartWindowRect = _windowRect;
+                    e.Use();
+                    break;
+
+                case EventType.MouseDrag:
+                    if (!_isResizing) return;
+                    float dx = mouse.x - _resizeStartMouse.x;
+                    float dy = mouse.y - _resizeStartMouse.y;
+
+                    // Min width must fit: left traffic-lights + right (zoom pair + resize handle, all square hitSize).
+                    float hitSize = _windowTitleBarHeight - 2f * WindowResizeMargin;
+                    float minWidth = WindowButtonPadding + 3f * WindowButtonSize + 2f * WindowButtonSpacing  // left chrome
+                                     + 3f * hitSize + 2f * WindowButtonSpacing                              // right squares
+                                     + WindowResizeMargin;                                                  // far-right margin
+                    // Min height: titlebar + a sliver of content (reuse WindowMinVisible).
+                    float minHeight = _windowTitleBarHeight + WindowMinVisible;
+
+                    float bottomY = _resizeStartWindowRect.y + _resizeStartWindowRect.height;
+                    float maxWidth  = Screen.width;
+                    // Top edge cannot leave the screen — height capped so newY >= 0.
+                    // Floor at minHeight so Mathf.Clamp's invariant (min <= max) holds
+                    // even when the window starts partly off-screen (bottomY < minHeight).
+                    float maxHeight = Mathf.Max(minHeight, Mathf.Min(Screen.height, bottomY));
+
+                    // Mouse moving right (dx>0) grows width (left edge pinned, right edge follows mouse).
+                    // Mouse moving down  (dy>0) shrinks height (bottom edge pinned, top edge follows mouse).
+                    float newWidth  = Mathf.Clamp(_resizeStartWindowRect.width  + dx, minWidth,  maxWidth);
+                    float newHeight = Mathf.Clamp(_resizeStartWindowRect.height - dy, minHeight, maxHeight);
+
+                    _windowRect.x      = _resizeStartWindowRect.x;       // left edge pinned
+                    _windowRect.width  = newWidth;
+                    _windowRect.height = newHeight;
+                    _windowRect.y      = bottomY - newHeight;            // bottom edge pinned
+                    ClampWindowPositionOnScreen();
+                    e.Use();
+                    break;
+
+                case EventType.MouseUp:
+                    if (!_isResizing) return;
+                    _isResizing = false;
+                    // Refit terminal grid to the new content area (only meaningful when
+                    // _fitColsAndRows=true; otherwise SyncWindowRectToTexture snaps back
+                    // to the fixed _cols×_rows texture, which is the documented contract).
+                    _resizeDirty = true;
+                    e.Use();
+                    break;
+            }
+        }
+
+        private void ApplyFontZoom(float factor)
+        {
+            if (!_terminalReady) return;
+
+            float newFontSize = Mathf.Clamp(_fontSize * factor, WindowFontSizeMin, WindowFontSizeMax);
+            if (Mathf.Approximately(newFontSize, _fontSize)) return;
+
+            _fontSize = newFontSize;
+
+            // Defer refit: ReinitializeTerminal destroys the native terminal,
+            // which Unity forbids inside an OnGUI event flow.
+            _resizeDirty = true;
+        }
+
+        private void DrawZoomGlyph(Rect rect, string text)
+        {
+            GUI.Label(rect, text, GetZoomGlyphStyle());
+        }
+
+        private GUIStyle GetZoomGlyphStyle()
+        {
+            if (_windowZoomGlyphStyle == null)
+            {
+                _windowZoomGlyphStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 14,
+                    fontStyle = FontStyle.Bold,
+                    clipping = TextClipping.Clip,
+                    wordWrap = false,
+                };
+                _windowZoomGlyphStyle.normal.textColor = WindowTitleTextColor;
+            }
+            return _windowZoomGlyphStyle;
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -1420,7 +1612,12 @@ namespace RatatuiUnity
             }
             else
             {
-                _windowRect = new Rect(_windowRect.x, _windowRect.y, w, h);
+                // Top-right pivot: right edge and top edge stay anchored across
+                // refits, so the right-side controls (zoom + resize handle) keep
+                // their on-screen position when the texture grows or shrinks.
+                float anchorRight = _windowRect.x + _windowRect.width;
+                _windowRect = new Rect(anchorRight - w, _windowRect.y, w, h);
+                ClampWindowPositionOnScreen();
             }
         }
 
@@ -1454,8 +1651,11 @@ namespace RatatuiUnity
                 int cellHeight = probe.CellHeight;
                 if (cellWidth <= 0 || cellHeight <= 0) return;
 
-                cols = Mathf.Max(1, Mathf.FloorToInt(w / cellWidth));
-                rows = Mathf.Max(1, Mathf.FloorToInt(h / cellHeight));
+                // Round rather than floor so fractional cells don't accumulate as
+                // window shrinkage across successive zoom refits. Texture may
+                // overshoot the content area by ≤ half a cell — visually negligible.
+                cols = Mathf.Max(1, Mathf.RoundToInt(w / cellWidth));
+                rows = Mathf.Max(1, Mathf.RoundToInt(h / cellHeight));
             }
         }
     }

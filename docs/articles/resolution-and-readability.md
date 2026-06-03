@@ -85,6 +85,47 @@ renderer.OnTerminalResized += (cols, rows, fontSize) =>
 - **Normal window**: fontSize is scaled against the **screen** (the stable viewport), then the window chrome snaps to wrap the new terminal texture exactly, keeping its on-screen position. `FitColsAndRows`, when enabled, still fills the actual `_windowRect` content area.
 - **Maximize toggle**: switching in/out of maximize marks the terminal dirty, so the next `Update` recomputes fontSize against the new target area.
 
+### Title-bar controls (zoom & resize)
+
+Window chrome includes macOS-style traffic lights on the left and three square controls on the right (laid out inward from the far-right corner):
+
+| Control | Color | Behavior |
+|---------|-------|----------|
+| **Resize handle** (`∗`) | Blue square | Drag to change the window frame size. `fontSize` is unchanged; with **Fit Cols And Rows** enabled, the grid is recomputed on mouse-up to fill the new content area. Dimmed while maximized. |
+| **− (zoom out)** | Blue square | Multiplies `fontSize` by `1 / 1.10` (~9% smaller per click). |
+| **+ (zoom in)** | Blue square | Multiplies `fontSize` by `1.10` (~10% larger per click). |
+
+Zoom buttons stay active in all window states, including maximized. `fontSize` is clamped to **1–200** px (or viewport-percent units when using `Vh` / `Vw` / `Vmin` / `Vmax`). Clicks that would not change `fontSize` (already at a clamp limit) are ignored.
+
+Zoom and resize are separate levers:
+
+- **Zoom** adjusts cell scale (`fontSize`) and refits the terminal texture; the window frame is then snapped to wrap the new texture.
+- **Resize** adjusts only the window frame; cell scale stays the same until refit recomputes cols × rows for the new content area.
+
+```mermaid
+flowchart TD
+    A[Title-bar + or − click] --> B[ApplyFontZoom factor 1.10 or 1/1.10]
+    B --> C[Clamp fontSize to 1..200]
+    C --> D[Mark resizeDirty]
+    D --> E[Next Update: ReinitializeTerminal]
+    E --> F[Recreate terminal + texture at new fontSize]
+    F --> G{Normal window?}
+    G -- yes --> H[SyncWindowRectToTexture top-right pivot]
+    G -- maximized --> I[Keep full-screen rect]
+    H --> J[OnTerminalResized]
+    I --> J
+
+    R[Resize handle drag] --> S[Update _windowRect only]
+    S --> T[Mouse-up: resizeDirty]
+    T --> E
+```
+
+**Refit pivot:** after a zoom refit in normal (non-maximized) window mode, `SyncWindowRectToTexture` uses a **top-right anchor** — the right and top edges of the window stay fixed so the zoom buttons and resize handle do not jump horizontally. Manual resize-drag uses a **bottom-left anchor** instead (left and bottom edges pinned) so the handle tracks the cursor naturally; that difference is intentional.
+
+**Pixel mode:** viewport polling is skipped, but zoom still sets `resizeDirty` explicitly so `ReinitializeTerminal` runs on the next `Update`.
+
+Programmatic equivalent: change the renderer's `FontSize` (or config `fontSize`) and call `ForceRefit()` — the title-bar buttons are a convenience UI over the same refit pipeline.
+
 ## Fit Cols And Rows
 
 The inspector toggle **Fit Cols And Rows** (under `Rows`) overrides the inspector-set `cols × rows` with values derived from the target pixel area. This makes the terminal grid match the screen / window / RectTransform aspect ratio.
