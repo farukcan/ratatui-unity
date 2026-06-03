@@ -62,7 +62,7 @@ namespace RatatuiUnity.Samples.Console
         private readonly List<int> _logRowStarts = new List<int>(256);
         private int _logTotalRows;
 
-        private readonly List<ConsoleCommand> _suggestions = new List<ConsoleCommand>(8);
+        private readonly List<ConsoleSuggestion> _suggestions = new List<ConsoleSuggestion>(8);
         private int _suggestionIndex;
 
         // ── Per-frame area IDs (used by mouse hit-testing) ───────────────────
@@ -597,7 +597,7 @@ namespace RatatuiUnity.Samples.Console
             var sp = term.BeginStyledParagraph(content, Alignment.Left, false);
             for (int i = 0; i < _suggestions.Count; i++)
             {
-                var cmd = _suggestions[i];
+                var s = _suggestions[i];
                 bool selected = i == _suggestionIndex;
                 bool hover = i == hoveredSuggestion;
                 Color rowBg = selected ? ColorSelectionBg : (hover ? ColorHoverBg : Color.clear);
@@ -605,12 +605,12 @@ namespace RatatuiUnity.Samples.Console
                 var mods = selected || hover ? Modifier.Bold : Modifier.None;
 
                 sp.Span(" ", bg: rowBg);
-                sp.Span(cmd.Name, fg: fg, bg: rowBg, modifiers: mods);
+                sp.Span(s.Display, fg: fg, bg: rowBg, modifiers: mods);
 
-                if (!string.IsNullOrEmpty(cmd.Description))
+                if (!string.IsNullOrEmpty(s.Detail))
                 {
                     sp.Span("  —  ", fg: ColorPromptDim, bg: rowBg);
-                    sp.Span(cmd.Description, fg: ColorPromptDim, bg: rowBg, modifiers: Modifier.Dim);
+                    sp.Span(s.Detail, fg: ColorPromptDim, bg: rowBg, modifiers: Modifier.Dim);
                 }
 
                 if (i < _suggestions.Count - 1) sp.Line();
@@ -759,10 +759,26 @@ namespace RatatuiUnity.Samples.Console
         {
             string text = _promptBuffer.ToString();
             _suggestions.Clear();
-            if (text.Length > 0 && _focus == InputFocus.Prompt)
+            if (_focus == InputFocus.Prompt && text.Length > 0)
             {
-                var matches = RatatuiConsole.Registry?.Match(text, 6);
-                if (matches != null) _suggestions.AddRange(matches);
+                int firstSpace = text.IndexOf(' ');
+                if (firstSpace < 0)
+                {
+                    var matches = RatatuiConsole.Registry?.Match(text, 6);
+                    if (matches != null)
+                    {
+                        foreach (var cmd in matches)
+                        {
+                            _suggestions.Add(new ConsoleSuggestion(
+                                cmd.Name, cmd.Description, cmd.Name, -1, true));
+                        }
+                    }
+                }
+                else
+                {
+                    var matches = BuiltinCommands.CompletePath(text, 6);
+                    _suggestions.AddRange(matches);
+                }
             }
             if (_suggestionIndex >= _suggestions.Count) _suggestionIndex = 0;
         }
@@ -987,10 +1003,15 @@ namespace RatatuiUnity.Samples.Console
         {
             if (_suggestions.Count == 0) return;
             int idx = Mathf.Clamp(_suggestionIndex, 0, _suggestions.Count - 1);
-            string name = _suggestions[idx].Name;
-            _promptBuffer.Length = 0;
-            _promptBuffer.Append(name);
-            _promptBuffer.Append(' ');
+            var s = _suggestions[idx];
+
+            if (s.ReplaceFromIndex < 0)
+                _promptBuffer.Length = 0;
+            else
+                _promptBuffer.Length = Mathf.Clamp(s.ReplaceFromIndex, 0, _promptBuffer.Length);
+
+            _promptBuffer.Append(s.Insert);
+            if (s.TrailingSpace) _promptBuffer.Append(' ');
             ClearSuggestions();
         }
 

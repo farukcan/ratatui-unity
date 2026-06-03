@@ -19,6 +19,31 @@ namespace RatatuiUnity.Samples.Console
     }
 
     /// <summary>
+    /// One row in the autocomplete popup. Display/Detail render in the popup;
+    /// Insert is what gets written back into the prompt buffer when applied.
+    /// ReplaceFromIndex = -1 replaces the whole buffer (command-name completion).
+    /// ReplaceFromIndex >= 0 replaces the substring starting at that index
+    /// (last-token completion, e.g. paths after a space).
+    /// </summary>
+    public readonly struct ConsoleSuggestion
+    {
+        public readonly string Display;
+        public readonly string Detail;
+        public readonly string Insert;
+        public readonly int ReplaceFromIndex;
+        public readonly bool TrailingSpace;
+
+        public ConsoleSuggestion(string display, string detail, string insert, int replaceFromIndex, bool trailingSpace)
+        {
+            Display = display ?? string.Empty;
+            Detail = detail ?? string.Empty;
+            Insert = insert ?? string.Empty;
+            ReplaceFromIndex = replaceFromIndex;
+            TrailingSpace = trailingSpace;
+        }
+    }
+
+    /// <summary>
     /// Stores console commands and provides parsing + autocomplete matching.
     /// Command lookup is case-insensitive.
     /// </summary>

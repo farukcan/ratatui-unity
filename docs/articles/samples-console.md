@@ -7,7 +7,8 @@
 - Captures `Debug.Log` / `LogWarning` / `LogError` / exceptions automatically
 - Auto-bootstrapped before the first scene loads (no GameObject to drag in)
 - Toggle with **`` ` ``** (backtick) by default
-- Built-in commands: `help`, `clear`, `quit`, `echo`, `version`, `fps`, `scene`, `time_scale`, `target_fps`, `sysinfo`, `pause`, `resume`, `gc`, `log_warning`, `log_error`, `log_exception`
+- 30+ built-in commands — app/time/scene control, PlayerPrefs, and a Linux-shell-style hierarchy browser (`cd`, `ls`, `tree`, `cat`, `rm`, `mv`, `cp`, …). Full reference: [Built-in Commands](#built-in-commands)
+- Quote-aware Tab autocompletion: commands at the start of the line, GameObject paths after a space (relative to the current `cd`'d node)
 - Command history (Up/Down arrows), scrollback, log timestamps
 - **Window mode** (default): draggable macOS-style frame with title-bar **zoom** (`+` / `−`, ~10% per click) and **resize** (drag the blue `◥` handle) — inherited from `RatatuiRenderer`; see [Resolution & Readability → OnGUI Window Mode](resolution-and-readability.md#ongui-window-mode)
 
@@ -85,6 +86,128 @@ RatatuiConsole.Log("Player connected: " + playerId);
 ```csharp
 RatatuiConsole.ExecuteCommand("time_scale 0.5");
 ```
+
+## Built-in Commands
+
+All commands below are registered automatically by `BuiltinCommands.Register()` at boot. They are listed by category. Argument syntax: `<required>` `[optional]` `a|b` (alternatives).
+
+Use `help` at runtime to print the live list.
+
+### Console & application lifecycle
+
+| Command | Description |
+|---------|-------------|
+| `help` | Print every registered command with its description. |
+| `clear` | Empty the log ring buffer. |
+| `quit` | Exit the app (`Application.Quit`); in the Editor, leaves play mode. |
+| `echo <text…>` | Print the joined argument string back to the console. |
+| `version` | Unity version, product name + `Application.version`, platform, editor/player flag. |
+| `sysinfo` | OS, device, CPU/GPU, memory totals, screen resolution + refresh rate, platform, internet reachability. |
+| `gc` | Force `GC.Collect()` and print managed-memory delta. |
+
+### Emitting log entries (for testing capture)
+
+| Command | Description |
+|---------|-------------|
+| `log_warning <text…>` | Emit a `Debug.LogWarning`. |
+| `log_error <text…>` | Emit a `Debug.LogError`. |
+| `log_exception <text…>` | Emit a `Debug.LogException(new Exception(text))`. |
+
+### Time & framerate
+
+| Command | Description |
+|---------|-------------|
+| `fps` | Current FPS, `deltaTime`, `unscaledDeltaTime`, `timeScale`, `targetFrameRate`. |
+| `time_scale [value]` | No arg: print current `Time.timeScale`. With value: set it (clamped ≥ 0). |
+| `target_fps [value]` | No arg: print current `Application.targetFrameRate`. With value: set it (`-1` = unlimited). |
+| `pause` | Set `timeScale` to 0; remembers the prior value. |
+| `resume` | Restore the `timeScale` captured by the most recent `pause`. |
+
+### Scene control
+
+| Command | Description |
+|---------|-------------|
+| `scene` | Active scene name + build index, and every loaded scene (`Single`/additive). |
+| `scene_load <name\|index> [additive]` | Load by scene name or build index. Append `additive` for `LoadSceneMode.Additive`; default is `Single`. Validates against build settings. |
+| `scene_reload` | Reload the currently active scene via its build index, `Single` mode. |
+
+### PlayerPrefs
+
+`prefs <subcommand> [args…]` — flat namespace with five subcommands:
+
+| Form | Description |
+|------|-------------|
+| `prefs get <key>` | Print the stored value. Probes string → float → int (PlayerPrefs is untagged). Reports `(not set)` if missing. |
+| `prefs set <key> <value>` | Infer the type from `<value>`: parses int first, then float, otherwise stores as string. Auto-saves. |
+| `prefs del <key>` | Delete one key (alias: `prefs delete`). Auto-saves. |
+| `prefs clear` | `PlayerPrefs.DeleteAll()` + save. **No confirmation.** |
+| `prefs save` | Force `PlayerPrefs.Save()` (`set`/`del`/`clear` already save). |
+
+### Hierarchy navigation
+
+These behave like a Linux shell where each GameObject is a directory containing its child GameObjects. The current path lives in a static `_cwd`, defaults to `/` (virtual scene root). Inactive GameObjects are visible — they live in the hierarchy regardless of `SetActive` state.
+
+| Command | Description |
+|---------|-------------|
+| `pwd` | Print the current path. |
+| `cd [path]` | Change current path. No arg → `/`. Accepts absolute (`/Player/Body`), relative (`Body`), `..`, `.`. Fails with "Path not found" if the resolved path is missing. |
+| `ls [path]` | List immediate children of `path` (or `_cwd`). Each row: `Name (Comp1, Comp2, …)`. Inactive children have a trailing `*`. |
+| `tree [path] [depth]` | Tree view with box-drawing connectors. No arg → use `_cwd`. Depth defaults to **3**. `tree 5` is shorthand for "current node, depth 5". Truncates at 500 nodes; dirs cut off by depth show `…(N)` with the unshown child count. |
+
+Path syntax recap:
+
+- `/A/B` — absolute, from scene root.
+- `A/B` — relative to `_cwd`.
+- `..` pops one segment, `.` is a no-op.
+- `/` alone refers to the virtual scene root (the container of all scene-root GameObjects).
+- A name with spaces must be quoted: `cd "Main Camera"`.
+
+### Hierarchy inspection
+
+| Command | Description |
+|---------|-------------|
+| `cat [path]` | Multi-line dump of one GameObject: name + active state, absolute path, scene/layer/tag/static, `activeSelf` vs `activeInHierarchy`, local pos/rot/scale, parent path, child names, component types. Refuses the virtual root. |
+
+### Hierarchy mutation
+
+These run in both edit-mode and play-mode (`Destroy` vs `DestroyImmediate` is chosen automatically). **No confirmation prompts** — pair with discipline.
+
+| Command | Description |
+|---------|-------------|
+| `rm <path>` | Destroy the GameObject (and its subtree). Refuses to destroy the virtual root. |
+| `mv <src> <dest>` | POSIX semantics. If `dest` is an existing GameObject → move `src` into it under its original name. If `dest` doesn't exist → split into parent + new name; parent must exist, `src` is reparented and renamed. Detects parent-into-descendant cycles. |
+| `cp <src> <dest>` | Same destination rules as `mv`, but instantiates a clone (`Object.Instantiate`) instead of moving. The clone takes the resolved name — no `(Clone)` suffix. |
+| `enable <path>` | `SetActive(true)`. |
+| `disable <path>` | `SetActive(false)`. |
+| `toggle <path>` | Flip `activeSelf`. |
+
+`mv` / `cp` destination semantics in one table:
+
+| Form | `dest` state | Result |
+|------|-------------|--------|
+| `cp A B` | `B` missing, parent (`/`) exists | clone at `/B` |
+| `cp A B` | `B` exists | clone is added under `B`, named `A` |
+| `cp A /` | always | clone at `/A` (scene root) |
+| `cp A /X/Y` | `/X/Y` missing, `/X` exists | clone at `/X/Y` |
+| `cp A /X/Y` | `/X/Y` exists | clone under `/X/Y`, named `A` |
+| `cp A /X/Y` | `/X` missing | error (`destination parent not found`) |
+
+### Tab autocompletion
+
+`Tab` completes whichever token the cursor is in:
+
+- **Before the first space** → command-name completion against the registry.
+- **After the first space** → path completion of the last whitespace-delimited token, resolved against `_cwd`.
+
+Behaviour details:
+
+- The popup shows up to 6 suggestions; `↑`/`↓` cycle through them, `Tab` applies the highlighted one. Suggestions for directories (nodes with children) show a trailing `/` and **do not** insert a trailing space, so you can immediately keep typing the next segment.
+- Quote-aware: if a candidate name contains a space, the inserted text wraps the affected segment in quotes (e.g. `cd "Main Camera"`, `cd "Main Camera"/Body`). Tokens you start with an unmatched `"` are recognised — typing `cd "Main Ca<Tab>` completes the quoted segment correctly.
+- Detail column shows the first three components of the candidate (`Transform, Camera, AudioListener, …`).
+
+### Programmatic access
+
+Built-in commands are just registrations against `RatatuiConsole.RegisterCommand`. Anything you register at runtime appears in `help`, in autocomplete, and via `ExecuteCommand`. Override a built-in by registering the same name — the registry stores by key, so the later registration wins.
 
 ## Configuration
 
