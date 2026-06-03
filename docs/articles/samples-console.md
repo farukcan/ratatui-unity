@@ -52,7 +52,7 @@ The whole pipeline is `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]` — no 
 using RatatuiUnity.Samples.Console;
 
 RatatuiConsole.Toggle();              // open or close
-RatatuiConsole.Open();
+RatatuiConsole.Open();                // takes scene keyboard focus (RatatuiFocusManager)
 RatatuiConsole.Close();
 bool open = RatatuiConsole.IsOpen;
 ```

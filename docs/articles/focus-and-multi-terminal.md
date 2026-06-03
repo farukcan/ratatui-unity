@@ -103,6 +103,8 @@ sequenceDiagram
 
 ## Patterns
 
+**Developer console (toggle key).** `RatatuiConsoleRenderer` calls `RequestFocus()` whenever it opens (`SetOpen(true)`), so the prompt accepts keyboard input right after `` ` `` without an extra click. Mouse-down on the console surface still transfers focus the same way as any other renderer.
+
 **Background log terminal that should not steal focus.** Don't disable input — instead, never call `RequestFocus()` on it, and the first time it gets a click the user explicitly asked to interact with it.
 
 **Modal dialog terminal.** When opening, call `dialog.RequestFocus()`. When closing, the previously focused renderer is *not* restored automatically; track the previous focus yourself if you need that:

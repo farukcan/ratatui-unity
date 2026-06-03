@@ -126,6 +126,11 @@ namespace RatatuiUnity.Samples.Console
             _isOpen = open;
             if (open)
             {
+                // Keyboard is gated to the focused renderer; opening via toggle/API must
+                // take scene focus immediately so typing works without a click first.
+                RequestFocus();
+                _focus = InputFocus.Prompt;
+
                 // The area_map is stale or empty after a closed period; ignore mouse
                 // events for one frame so the next BuildFrame can populate it before
                 // ProcessMouse runs against it.
