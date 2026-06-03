@@ -1158,12 +1158,12 @@ namespace RatatuiUnity
                 }
             }
 
-            // Resize handle: blue square with ∗ glyph, far-right. Dimmed while maximized.
+            // Resize handle: blue square with ✴︎ glyph, far-right. Dimmed while maximized.
             Color handleColor = _isMaximized
                 ? WindowControlBlueColor * WindowZoomDisabledTint
                 : WindowControlBlueColor;
             FillRect(resizeHandleRect, handleColor);
-            DrawZoomGlyph(resizeHandleRect, "∗");
+            DrawZoomGlyph(resizeHandleRect, "✴︎");
         }
 
         private void ToggleMaximized()

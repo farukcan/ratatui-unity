@@ -8,3 +8,6 @@ apiRules:
   - exclude:
       uidRegex: ^UnityEngine\.Events
       type: Namespace
+  - exclude:
+      uidRegex: ^UnityEngine\.Serialization
+      type: Namespace

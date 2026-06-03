@@ -91,7 +91,7 @@ Window chrome includes macOS-style traffic lights on the left and three square c
 
 | Control | Color | Behavior |
 |---------|-------|----------|
-| **Resize handle** (`∗`) | Blue square | Drag to change the window frame size. `fontSize` is unchanged; with **Fit Cols And Rows** enabled, the grid is recomputed on mouse-up to fill the new content area. Dimmed while maximized. |
+| **Resize handle** (`✴︎`) | Blue square | Drag to change the window frame size. `fontSize` is unchanged; with **Fit Cols And Rows** enabled, the grid is recomputed on mouse-up to fill the new content area. Dimmed while maximized. |
 | **− (zoom out)** | Blue square | Multiplies `fontSize` by `1 / 1.10` (~9% smaller per click). |
 | **+ (zoom in)** | Blue square | Multiplies `fontSize` by `1.10` (~10% larger per click). |
 

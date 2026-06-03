@@ -78,7 +78,7 @@ Always call `base.OnFocusChanged(isFocused)`. The base implementation clears the
 
 In `OnGuiMode.Window`, the focused window draws on top of others via `GUI.depth` and its title bar uses `_windowTitleBarColorFocused` (slightly brighter); non-focused windows use `_windowTitleBarColor` (dim). Both colors are SerializeFields on the renderer — set them to match your theme.
 
-The title bar also exposes **zoom** (`+` / `−`) and **resize** (`∗`) controls on the right (all blue squares). Clicks on those buttons do not start a window drag; they adjust `fontSize` or the frame size instead. See [Resolution & Readability → OnGUI Window Mode](resolution-and-readability.md#ongui-window-mode).
+The title bar also exposes **zoom** (`+` / `−`) and **resize** (`✴︎`) controls on the right (all blue squares). Clicks on those buttons do not start a window drag; they adjust `fontSize` or the frame size instead. See [Resolution & Readability → OnGUI Window Mode](resolution-and-readability.md#ongui-window-mode).
 
 ## Event Flow
 

@@ -459,6 +459,15 @@ namespace UnityEngine
     }
 }
 
+namespace UnityEngine.Serialization
+{
+    [AttributeUsage(AttributeTargets.Field)]
+    public class FormerlySerializedAsAttribute : Attribute
+    {
+        public FormerlySerializedAsAttribute(string oldName) { }
+    }
+}
+
 namespace UnityEngine.UI
 {
     public class RawImage : MonoBehaviour
