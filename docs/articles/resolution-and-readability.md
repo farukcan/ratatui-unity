@@ -126,6 +126,8 @@ flowchart TD
 
 Programmatic equivalent: change the renderer's `FontSize` (or config `fontSize`) and call `ForceRefit()` — the title-bar buttons are a convenience UI over the same refit pipeline.
 
+**Chrome font:** the title bar and the `+ / − / ◥` glyphs are drawn with `RatatuiRenderer._windowChromeFont` (inspector field). It defaults to the bundled JetBrains Mono so the non-ASCII glyphs render on platforms without OS font fallback — most notably **WebGL**, where Unity's default GUI font lacks `◥` (U+25E5) and `−` (U+2212). New `RatatuiRenderer` components auto-populate this field via `Reset` / `OnValidate`; if explicitly cleared, the style falls back to Unity's default GUI font.
+
 ## Fit Cols And Rows
 
 The inspector toggle **Fit Cols And Rows** (under `Rows`) overrides the inspector-set `cols × rows` with values derived from the target pixel area. This makes the terminal grid match the screen / window / RectTransform aspect ratio.

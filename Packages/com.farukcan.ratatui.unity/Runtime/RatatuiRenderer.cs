@@ -94,6 +94,12 @@ namespace RatatuiUnity
         [Tooltip("Start maximized (fills screen) on first open in Window mode.")]
         [SerializeField] private bool _windowStartMaximized;
 
+        [Tooltip("Font used for OnGUI window chrome (title bar, zoom/resize glyphs). " +
+                 "Defaults to the bundled JetBrains Mono so non-ASCII glyphs like ◥ render " +
+                 "on platforms without OS font fallback (e.g. WebGL). " +
+                 "Falls back to Unity's default GUI font when null.")]
+        [SerializeField] private Font _windowChromeFont;
+
         [Header("Input Settings")]
         [Tooltip("Enable input processing (keyboard + mouse).")]
         [SerializeField] private bool _enableInput = true;
@@ -310,6 +316,26 @@ namespace RatatuiUnity
         };
 
         // ── Unity Lifecycle ───────────────────────────────────────────────────
+
+#if UNITY_EDITOR
+        // Auto-populate _windowChromeFont from the package's bundled JetBrains Mono
+        // so the inspector is never empty. WebGL (and any platform without OS font
+        // fallback) needs an explicit font for non-ASCII chrome glyphs like ◥ and −.
+        private const string BundledChromeFontPath =
+            "Packages/com.farukcan.ratatui.unity/Runtime/Fonts/JetBrainsMono-Regular.ttf";
+
+        protected virtual void Reset()
+        {
+            if (_windowChromeFont == null)
+                _windowChromeFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(BundledChromeFontPath);
+        }
+
+        protected virtual void OnValidate()
+        {
+            if (_windowChromeFont == null)
+                _windowChromeFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(BundledChromeFontPath);
+        }
+#endif
 
         protected virtual void Awake()
         {
@@ -1111,7 +1137,9 @@ namespace RatatuiUnity
                 };
                 _windowTitleStyle.normal.textColor = WindowTitleTextColor;
             }
-            // Refresh on every call so screen resizes update the title size.
+            // Refresh on every call so screen resizes update the title size
+            // and font swaps at runtime take effect.
+            _windowTitleStyle.font = _windowChromeFont;
             _windowTitleStyle.fontSize = WindowTitleFontSize;
             return _windowTitleStyle;
         }
@@ -1399,8 +1427,12 @@ namespace RatatuiUnity
                 };
                 _windowZoomGlyphStyle.normal.textColor = WindowTitleTextColor;
             }
-            // Glyph nearly fills the button — refresh every call so screen resizes track.
-            _windowZoomGlyphStyle.fontSize = Mathf.Max(1, Mathf.RoundToInt(WindowButtonSize * 0.9f));
+            // Glyph sits inside the button with a small margin so it stays clear of
+            // the rounded corners. Refreshed every call so screen resizes track and
+            // runtime font swaps take effect. Non-ASCII glyphs (e.g. ◥, −) need the
+            // bundled chrome font on platforms without OS font fallback.
+            _windowZoomGlyphStyle.font = _windowChromeFont;
+            _windowZoomGlyphStyle.fontSize = Mathf.Max(1, Mathf.RoundToInt(WindowButtonSize * 0.65f));
             return _windowZoomGlyphStyle;
         }
 
