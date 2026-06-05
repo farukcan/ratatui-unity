@@ -343,6 +343,22 @@ namespace RatatuiUnity
             _cachedMainCamera = Camera.main;
             ValidateInputRequirements();
             SnapshotScreenMetrics();
+            WarnIfChromeFontMissing();
+        }
+
+        // Diagnostic for the WebGL chrome-glyph regression: Unity's default GUI font
+        // (Arial) lacks ◥ and −, so when _windowChromeFont is null on a platform without
+        // OS font fallback the buttons render blank. Surface that explicitly instead of
+        // failing silently.
+        private void WarnIfChromeFontMissing()
+        {
+            if (_onGuiMode != OnGuiMode.Window) return;
+            if (_windowChromeFont != null) return;
+            Debug.LogWarning(
+                $"[RatatuiRenderer] '{name}': _windowChromeFont is not assigned. " +
+                "OnGUI Window chrome glyphs (◥, −) will not render on platforms without " +
+                "OS font fallback (e.g. WebGL). Assign the bundled JetBrainsMono-Regular " +
+                "font in the inspector.", this);
         }
 
         /// <summary>
@@ -1421,7 +1437,10 @@ namespace RatatuiUnity
                 _windowZoomGlyphStyle = new GUIStyle(GUI.skin.label)
                 {
                     alignment = TextAnchor.MiddleCenter,
-                    fontStyle = FontStyle.Bold,
+                    // FontStyle.Bold avoided on purpose: the bundled JetBrains Mono is the
+                    // Regular cut and Unity's runtime bold-simulate has been observed to drop
+                    // non-ASCII glyphs (◥, −) on WebGL. Leave style Normal.
+                    fontStyle = FontStyle.Normal,
                     clipping = TextClipping.Clip,
                     wordWrap = false,
                 };
