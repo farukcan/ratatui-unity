@@ -171,6 +171,14 @@ namespace RatatuiUnity
         /// <summary>Start maximized (fills screen) on first open in Window mode.</summary>
         public bool WindowStartMaximized { get => _windowStartMaximized; set => _windowStartMaximized = value; }
 
+        /// <summary>
+        /// Font used for OnGUI window chrome (title bar + zoom / resize glyphs). Setter
+        /// exists so renderers created via <c>AddComponent</c> at runtime — which skip
+        /// <c>Reset</c> / <c>OnValidate</c> and therefore start with a null field — can
+        /// have the bundled JetBrains Mono pushed in before <see cref="Awake"/> finishes.
+        /// </summary>
+        public Font WindowChromeFont { get => _windowChromeFont; set => _windowChromeFont = value; }
+
         /// <summary>Enable input processing (keyboard + mouse).</summary>
         public bool EnableInput { get => _enableInput; set => _enableInput = value; }
 

@@ -24,3 +24,4 @@ MonoBehaviour:
   maxLogEntries: 2000
   maxHistoryEntries: 64
   showTimestamp: 1
+  windowChromeFont: {fileID: 12800000, guid: 7c3f9b1a4e6d2c8f5b9a7e3d1c2f4a6b, type: 3}

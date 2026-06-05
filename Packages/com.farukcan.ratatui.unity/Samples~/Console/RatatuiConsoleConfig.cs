@@ -60,6 +60,12 @@ namespace RatatuiUnity.Samples.Console
         [Tooltip("Prepend each log line with [HH:mm:ss].")]
         public bool showTimestamp = true;
 
+        [Tooltip("Font used for OnGUI window chrome (title bar + zoom / resize glyphs). " +
+                 "Required for non-ASCII glyphs (◥, −) to render on WebGL, where Unity's " +
+                 "default GUI font lacks them and no OS font fallback exists. " +
+                 "Auto-populated with the bundled JetBrains Mono via OnValidate.")]
+        public Font windowChromeFont;
+
         /// <summary>
         /// Build a default in-memory instance used when no asset is present
         /// under <c>Resources/RatatuiConsoleConfig</c>.
@@ -68,7 +74,23 @@ namespace RatatuiUnity.Samples.Console
         {
             var cfg = CreateInstance<RatatuiConsoleConfig>();
             cfg.name = "RatatuiConsoleConfig (Default)";
+#if UNITY_EDITOR
+            cfg.windowChromeFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(BundledChromeFontPath);
+#endif
             return cfg;
         }
+
+#if UNITY_EDITOR
+        // Bundled JetBrains Mono inside the package — same TTF the Rust core embeds, so
+        // chrome glyphs match the terminal font on platforms without OS font fallback.
+        private const string BundledChromeFontPath =
+            "Packages/com.farukcan.ratatui.unity/Runtime/Fonts/JetBrainsMono-Regular.ttf";
+
+        private void OnValidate()
+        {
+            if (windowChromeFont == null)
+                windowChromeFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(BundledChromeFontPath);
+        }
+#endif
     }
 }
