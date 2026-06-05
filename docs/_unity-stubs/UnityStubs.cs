@@ -214,6 +214,16 @@ namespace UnityEngine
 
     public enum TextClipping { Overflow, Clip }
 
+    public enum FontStyle
+    {
+        Normal,
+        Bold,
+        Italic,
+        BoldAndItalic
+    }
+
+    public class Font : Object { }
+
     public enum ScaleMode
     {
         StretchToFill, ScaleAndCrop, ScaleToFit
@@ -229,7 +239,9 @@ namespace UnityEngine
         public GUIStyle() { }
         public GUIStyle(GUIStyle other) { }
         public TextAnchor alignment { get; set; }
+        public Font font { get; set; }
         public int fontSize { get; set; }
+        public FontStyle fontStyle { get; set; }
         public TextClipping clipping { get; set; }
         public bool wordWrap { get; set; }
         public GUIStyleState normal { get; } = new GUIStyleState();
