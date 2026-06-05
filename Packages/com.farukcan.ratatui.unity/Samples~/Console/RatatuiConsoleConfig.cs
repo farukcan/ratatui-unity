@@ -61,7 +61,7 @@ namespace RatatuiUnity.Samples.Console
         public bool showTimestamp = true;
 
         [Tooltip("Font used for OnGUI window chrome (title bar + zoom / resize glyphs). " +
-                 "Required for non-ASCII glyphs (◥, −) to render on WebGL, where Unity's " +
+                 "Required for non-ASCII glyphs (↗, −) to render on WebGL, where Unity's " +
                  "default GUI font lacks them and no OS font fallback exists. " +
                  "Auto-populated with the bundled JetBrains Mono via OnValidate.")]
         public Font windowChromeFont;

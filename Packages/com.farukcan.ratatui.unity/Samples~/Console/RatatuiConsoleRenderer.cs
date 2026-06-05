@@ -1246,7 +1246,7 @@ namespace RatatuiUnity.Samples.Console
             // Push the chrome font from config to the base renderer before base.Awake.
             // The renderer is created via AddComponent at runtime, so the base's Reset /
             // OnValidate auto-populate path is skipped — without this hop, the chrome
-            // glyphs (◥, −) render blank on WebGL.
+            // glyphs (↗, −) render blank on WebGL.
             WindowChromeFont = cfg.windowChromeFont;
             FitColsAndRows = true;
             EnableInput = true;

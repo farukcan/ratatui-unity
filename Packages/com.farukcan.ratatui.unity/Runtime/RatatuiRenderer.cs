@@ -95,7 +95,7 @@ namespace RatatuiUnity
         [SerializeField] private bool _windowStartMaximized;
 
         [Tooltip("Font used for OnGUI window chrome (title bar, zoom/resize glyphs). " +
-                 "Defaults to the bundled JetBrains Mono so non-ASCII glyphs like ◥ render " +
+                 "Defaults to the bundled JetBrains Mono so non-ASCII glyphs like ↗ render " +
                  "on platforms without OS font fallback (e.g. WebGL). " +
                  "Falls back to Unity's default GUI font when null.")]
         [SerializeField] private Font _windowChromeFont;
@@ -328,7 +328,7 @@ namespace RatatuiUnity
 #if UNITY_EDITOR
         // Auto-populate _windowChromeFont from the package's bundled JetBrains Mono
         // so the inspector is never empty. WebGL (and any platform without OS font
-        // fallback) needs an explicit font for non-ASCII chrome glyphs like ◥ and −.
+        // fallback) needs an explicit font for non-ASCII chrome glyphs like ↗ and −.
         private const string BundledChromeFontPath =
             "Packages/com.farukcan.ratatui.unity/Runtime/Fonts/JetBrainsMono-Regular.ttf";
 
@@ -355,7 +355,7 @@ namespace RatatuiUnity
         }
 
         // Diagnostic for the WebGL chrome-glyph regression: Unity's default GUI font
-        // (Arial) lacks ◥ and −, so when _windowChromeFont is null on a platform without
+        // (Arial) lacks ↗ and −, so when _windowChromeFont is null on a platform without
         // OS font fallback the buttons render blank. Surface that explicitly instead of
         // failing silently.
         private void WarnIfChromeFontMissing()
@@ -364,7 +364,7 @@ namespace RatatuiUnity
             if (_windowChromeFont != null) return;
             Debug.LogWarning(
                 $"[RatatuiRenderer] '{name}': _windowChromeFont is not assigned. " +
-                "OnGUI Window chrome glyphs (◥, −) will not render on platforms without " +
+                "OnGUI Window chrome glyphs (↗, −) will not render on platforms without " +
                 "OS font fallback (e.g. WebGL). Assign the bundled JetBrainsMono-Regular " +
                 "font in the inspector.", this);
         }
@@ -1258,12 +1258,15 @@ namespace RatatuiUnity
                 }
             }
 
-            // Resize handle: blue rounded square with ◥ glyph, far-right. Dimmed while maximized.
+            // Resize handle: blue rounded square with ↗ glyph, far-right. Dimmed while maximized.
+            // ↗ (U+2197) chosen over ◥ (U+25E5) because JetBrains Mono Regular contains the
+            // arrow but not the upper-right triangle. The triangle would tofu on WebGL where
+            // OS font fallback is unavailable.
             Color handleColor = _isMaximized
                 ? WindowControlBlueColor * WindowZoomDisabledTint
                 : WindowControlBlueColor;
             FillRoundedRect(resizeHandleRect, handleColor);
-            DrawZoomGlyph(resizeHandleRect, "◥");
+            DrawZoomGlyph(resizeHandleRect, "↗");
         }
 
         private void ToggleMaximized()
@@ -1447,7 +1450,7 @@ namespace RatatuiUnity
                     alignment = TextAnchor.MiddleCenter,
                     // FontStyle.Bold avoided on purpose: the bundled JetBrains Mono is the
                     // Regular cut and Unity's runtime bold-simulate has been observed to drop
-                    // non-ASCII glyphs (◥, −) on WebGL. Leave style Normal.
+                    // non-ASCII glyphs (↗, −) on WebGL. Leave style Normal.
                     fontStyle = FontStyle.Normal,
                     clipping = TextClipping.Clip,
                     wordWrap = false,
@@ -1456,7 +1459,7 @@ namespace RatatuiUnity
             }
             // Glyph sits inside the button with a small margin so it stays clear of
             // the rounded corners. Refreshed every call so screen resizes track and
-            // runtime font swaps take effect. Non-ASCII glyphs (e.g. ◥, −) need the
+            // runtime font swaps take effect. Non-ASCII glyphs (e.g. ↗, −) need the
             // bundled chrome font on platforms without OS font fallback.
             _windowZoomGlyphStyle.font = _windowChromeFont;
             _windowZoomGlyphStyle.fontSize = Mathf.Max(1, Mathf.RoundToInt(WindowButtonSize * 0.65f));
