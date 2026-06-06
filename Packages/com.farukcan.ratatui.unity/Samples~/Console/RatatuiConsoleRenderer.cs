@@ -51,6 +51,7 @@ namespace RatatuiUnity.Samples.Console
         private int _selectedEntryIndex = -1;
         private bool _detailOpen;
         private int _detailScroll;
+        private int _messageScroll;
 
         // Log scroll is measured in DISPLAY ROWS (not vis indices), because each
         // log can occupy several rows when its message contains newlines.
@@ -71,6 +72,7 @@ namespace RatatuiUnity.Samples.Console
         private uint _searchArea;
         private uint _logListArea;
         private uint _detailPanelArea;
+        private uint _detailMessageArea;
         private uint _detailStackArea;
         private uint _detailCopyArea;
         private uint _detailEmailArea;
@@ -221,6 +223,8 @@ namespace RatatuiUnity.Samples.Console
             // Internal split: message(5) + separator(1) + stack(?) + buttons(3)
             return Mathf.Max(1, bodyInner - 5 - 1 - 3);
         }
+
+        private int FallbackDetailMessageHeight() => 3;
 
         // ── Header (Tabs + Search) ───────────────────────────────────────────
 
@@ -467,12 +471,7 @@ namespace RatatuiUnity.Samples.Console
                 Constraint.Fill(1),
                 Constraint.Length(3));
 
-            string tag = KindTag(entry.Kind);
-            var msg = term.BeginStyledParagraph(rows[0], Alignment.Left, wrap: true);
-            msg.Span(tag + " ", fg: KindColor(entry.Kind), modifiers: Modifier.Bold);
-            RenderMultiline(msg, entry.Message ?? string.Empty,
-                KindForeground(entry.Kind), Modifier.None);
-            msg.Render();
+            BuildMessage(term, rows[0], entry);
 
             term.BeginStyledParagraph(rows[1], Alignment.Left, false)
                 .Span("CALL STACK:", fg: ColorPromptDim, modifiers: Modifier.Bold)
@@ -488,6 +487,44 @@ namespace RatatuiUnity.Samples.Console
             _detailCopyArea = DrawButton(term, btnCols[0], "[ COPY ]");
             _detailEmailArea = DrawButton(term, btnCols[1], "[ EMAIL ]");
             _detailCloseArea = DrawButton(term, btnCols[2], "[ CLOSE ]");
+        }
+
+        private void BuildMessage(RatatuiTerminal term, uint area, ConsoleLogEntry entry)
+        {
+            // Reserve right column for scrollbar.
+            uint[] cols = term.Split(area, Direction.Horizontal,
+                Constraint.Fill(1),
+                Constraint.Length(1));
+            uint content = cols[0];
+            uint scroll = cols[1];
+            _detailMessageArea = content;
+
+            int areaHeight = FallbackDetailMessageHeight();
+            int areaWidth = 40;
+            if (term.TryGetAreaRect(content, out _, out _, out int w, out int h))
+            {
+                if (h > 0) areaHeight = h;
+                if (w > 0) areaWidth = w;
+            }
+
+            string tag = KindTag(entry.Kind) + " ";
+            var lines = WrapMessage(entry.Message ?? string.Empty, areaWidth, tag.Length);
+            ClampMessageScroll(lines.Count, areaHeight);
+
+            var sp = term.BeginStyledParagraph(content, Alignment.Left, wrap: false);
+            int start = _messageScroll;
+            int end = Mathf.Min(lines.Count, start + areaHeight);
+            for (int i = start; i < end; i++)
+            {
+                if (i == 0)
+                    sp.Span(tag, fg: KindColor(entry.Kind), modifiers: Modifier.Bold);
+                sp.Span(lines[i], fg: KindForeground(entry.Kind), modifiers: Modifier.None);
+                if (i < end - 1) sp.Line();
+            }
+            sp.Render();
+
+            term.Scrollbar(scroll, lines.Count, _messageScroll, areaHeight,
+                ScrollbarOrientation.VerticalRight, autoHide: true);
         }
 
         private void BuildStackTrace(RatatuiTerminal term, uint area, ConsoleLogEntry entry)
@@ -669,6 +706,7 @@ namespace RatatuiUnity.Samples.Console
                 _selectedEntryIndex = -1;
                 _detailOpen = false;
                 _detailScroll = 0;
+                _messageScroll = 0;
                 return;
             }
 
@@ -695,6 +733,7 @@ namespace RatatuiUnity.Samples.Console
                     _selectedEntryIndex = -1;
                     _detailOpen = false;
                     _detailScroll = 0;
+                    _messageScroll = 0;
                 }
             }
             else
@@ -936,7 +975,11 @@ namespace RatatuiUnity.Samples.Console
         private void HandleScroll(TerminalMouseEvent e)
         {
             int dir = e.ScrollDelta > 0 ? -1 : 1;
-            if (_detailOpen && (e.AreaId == _detailPanelArea || e.AreaId == _detailStackArea))
+            if (_detailOpen && e.AreaId == _detailMessageArea)
+            {
+                _messageScroll = Mathf.Max(0, _messageScroll + dir);
+            }
+            else if (_detailOpen && (e.AreaId == _detailPanelArea || e.AreaId == _detailStackArea))
             {
                 _detailScroll = Mathf.Max(0, _detailScroll + dir);
             }
@@ -968,6 +1011,7 @@ namespace RatatuiUnity.Samples.Console
                     _selectedEntryIndex = _visibleIndices[vis];
                     _detailOpen = true;
                     _detailScroll = 0;
+                    _messageScroll = 0;
                     return;
                 }
             }
@@ -1065,6 +1109,8 @@ namespace RatatuiUnity.Samples.Console
                 ? (delta > 0 ? 0 : _visibleIndices.Count - 1)
                 : Mathf.Clamp(curVis + delta, 0, _visibleIndices.Count - 1);
             _selectedEntryIndex = _visibleIndices[nextVis];
+            _detailScroll = 0;
+            _messageScroll = 0;
             EnsureSelectedVisible();
         }
 
@@ -1164,6 +1210,40 @@ namespace RatatuiUnity.Samples.Console
             _detailScroll = Mathf.Clamp(_detailScroll, 0, maxScroll);
         }
 
+        private void ClampMessageScroll(int total, int viewportHeight)
+        {
+            int maxScroll = Mathf.Max(0, total - viewportHeight);
+            _messageScroll = Mathf.Clamp(_messageScroll, 0, maxScroll);
+        }
+
+        // Word-wraps text to `width`. First visual line gets `firstOffset` reserved
+        // (e.g. for an inline tag). Breaks on spaces, hard-splits long runs.
+        private static List<string> WrapMessage(string text, int width, int firstOffset)
+        {
+            var lines = new List<string>(4);
+            if (width <= 0) width = 1;
+            string norm = (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+            int avail = Mathf.Max(1, width - firstOffset);
+            foreach (string para in norm.Split('\n'))
+            {
+                int pos = 0;
+                do
+                {
+                    int take = Mathf.Min(avail, para.Length - pos);
+                    if (pos + take < para.Length && take > 0)
+                    {
+                        int br = para.LastIndexOf(' ', pos + take - 1, take);
+                        if (br >= pos) take = br - pos;
+                    }
+                    lines.Add(para.Substring(pos, take).TrimEnd(' '));
+                    pos += Mathf.Max(1, take);
+                    while (pos < para.Length && para[pos] == ' ') pos++;
+                    avail = width;
+                } while (pos < para.Length);
+            }
+            return lines;
+        }
+
         // ── Multi-line helpers ───────────────────────────────────────────────
 
         private static int CountVisualLines(string text)
@@ -1173,22 +1253,6 @@ namespace RatatuiUnity.Samples.Console
             for (int i = 0; i < text.Length; i++)
                 if (text[i] == '\n') count++;
             return count;
-        }
-
-        private static void RenderMultiline(StyledText sp, string text, Color fg, Modifier modifiers)
-        {
-            if (string.IsNullOrEmpty(text)) return;
-            string normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
-            int start = 0;
-            for (int i = 0; i < normalized.Length; i++)
-            {
-                if (normalized[i] != '\n') continue;
-                sp.Span(normalized.Substring(start, i - start), fg: fg, modifiers: modifiers);
-                sp.Line();
-                start = i + 1;
-            }
-            if (start < normalized.Length)
-                sp.Span(normalized.Substring(start), fg: fg, modifiers: modifiers);
         }
 
         // ── Style helpers ────────────────────────────────────────────────────
