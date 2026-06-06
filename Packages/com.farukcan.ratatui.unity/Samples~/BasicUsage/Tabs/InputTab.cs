@@ -14,8 +14,10 @@ namespace RatatuiUnity.Demo
         private readonly TerminalInput _nameInput = new TerminalInput("Faruk");
         private readonly TerminalInput _messageInput = new TerminalInput("Hello, ratatui-unity!");
 
-        private int _focusedField; // 0 = name, 1 = message
+        private int _focusedField = -1; // -1 = none, 0 = name, 1 = message
         private string _submitted = "";
+
+        public bool HasFocusedField => _focusedField >= 0;
 
         // Area IDs for mouse hit-testing
         private uint _nameArea;
@@ -29,12 +31,17 @@ namespace RatatuiUnity.Demo
 
         public void OnKeyEvent(TerminalKeyEvent e)
         {
-            // Tab switches focus
+            // Tab cycles: none -> name -> message -> none
             if (e.Key == KeyCode.Tab)
             {
-                _focusedField = (_focusedField + 1) % 2;
+                _focusedField++;
+                if (_focusedField > 1) _focusedField = -1;
                 return;
             }
+
+            // No field focused: let outer tab navigation handle keys
+            if (_focusedField < 0)
+                return;
 
             // Enter submits
             if (e.Key == KeyCode.Return || e.Key == KeyCode.KeypadEnter)
@@ -97,8 +104,16 @@ namespace RatatuiUnity.Demo
             term.Block(rows[3], "Output", Borders.All);
             uint outputInner = term.Inner(rows[3]);
 
-            var info = FocusedInput;
-            string status = $"Cursor: {info.Cursor}/{info.Value.Length}  Scroll: {info.ScrollOffset}";
+            string status;
+            if (_focusedField < 0)
+            {
+                status = "No field focused (Tab or click to focus)";
+            }
+            else
+            {
+                var info = FocusedInput;
+                status = $"Cursor: {info.Cursor}/{info.Value.Length}  Scroll: {info.ScrollOffset}";
+            }
             if (!string.IsNullOrEmpty(_submitted))
                 status += $"\nSubmitted: {_submitted}";
 

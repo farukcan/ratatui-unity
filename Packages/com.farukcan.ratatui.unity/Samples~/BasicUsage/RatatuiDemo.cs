@@ -73,9 +73,10 @@ public class RatatuiDemo : RatatuiRenderer
                     || e.Character == 'd' || e.Character == 'D';
         bool prevTab = e.Key == KeyCode.LeftArrow
                     || e.Character == 'a' || e.Character == 'A';
-        bool inputTabActive = _tabs[_activeTab] == _inputTab;
-        if (nextTab && !inputTabActive) { _activeTab = (_activeTab + 1) % _tabs.Length; return; }
-        if (prevTab && !inputTabActive) { _activeTab = (_activeTab + _tabs.Length - 1) % _tabs.Length; return; }
+        // A/D consumed by InputTab only while a field is focused
+        bool inputCaptures = _tabs[_activeTab] == _inputTab && _inputTab.HasFocusedField;
+        if (nextTab && !inputCaptures) { _activeTab = (_activeTab + 1) % _tabs.Length; return; }
+        if (prevTab && !inputCaptures) { _activeTab = (_activeTab + _tabs.Length - 1) % _tabs.Length; return; }
 
         _tabs[_activeTab].OnKeyEvent(e);
     }

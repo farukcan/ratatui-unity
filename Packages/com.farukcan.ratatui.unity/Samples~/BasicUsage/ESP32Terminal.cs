@@ -61,6 +61,14 @@ public class ESP32Terminal : RatatuiRenderer
         AddLog("I", "Type 'help' for commands");
     }
 
+    private void Start()
+    {
+        // Input field is always active in this sample — claim keyboard focus
+        // explicitly so the user can type immediately, even if other renderers
+        // exist in the scene and registered after us.
+        RequestFocus();
+    }
+
     protected override void Update()
     {
         float dt = Time.deltaTime;
