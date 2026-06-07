@@ -5,10 +5,11 @@ using UnityEngine;
 namespace RatatuiUnity
 {
     /// <summary>
-    /// Multi-line text editor: line-aware cursor, vertical scrolling, selection
-    /// spanning lines, clipboard (preserves newlines), undo/redo, click-and-drag
-    /// selection, double-click word + triple-click all, focus-time select-all,
-    /// ReadOnly, optional MaxLength + CharFilter.
+    /// Multi-line text editor: line-aware cursor, vertical + horizontal scrollbars
+    /// (auto-hide), mouse-wheel scrolling, selection spanning lines, clipboard
+    /// (preserves newlines), undo/redo, click-and-drag selection, double-click
+    /// word + triple-click all, focus-time select-all, ReadOnly, optional
+    /// MaxLength + CharFilter.
     /// </summary>
     public class TerminalTextArea
     {
@@ -21,6 +22,17 @@ namespace RatatuiUnity
 
         private uint _lastAreaId;
         private int _lastAreaX, _lastAreaY, _lastAreaW, _lastAreaH;
+
+        // Sub-areas registered during the last Render so callers can recognize a
+        // click anywhere inside the widget (text region or scrollbar strips).
+        // hit_test returns the most deeply nested area, which would otherwise be
+        // a split child the caller does not track. 0 = none.
+        private uint _textSubAreaId, _vbarAreaId, _hbarAreaId;
+
+        // Cursor index at the last time the view was scrolled to keep the cursor
+        // visible. Mouse-wheel scrolling leaves the cursor untouched, so the view
+        // only snaps back to the cursor when the cursor itself moves.
+        private int _lastEnsuredCursor = -1;
 
         // Per-line horizontal shift applied to the cursor line so a long line
         // keeps the cursor on-screen. -1 = no line is shifted.
@@ -502,9 +514,25 @@ namespace RatatuiUnity
             }
         }
 
+        /// <summary>
+        /// True if <paramref name="areaId"/> is the outer area passed to the last
+        /// <see cref="Render"/> call or one of the scrollbar sub-areas it created.
+        /// Callers use this to route clicks/scrolls to this widget even though
+        /// hit-testing resolves to the most deeply nested (split) area.
+        /// </summary>
+        public bool OwnsArea(uint areaId)
+        {
+            if (areaId == 0) return false;
+            return areaId == _lastAreaId
+                || areaId == _textSubAreaId
+                || areaId == _vbarAreaId
+                || areaId == _hbarAreaId;
+        }
+
         // ── Mouse handling ───────────────────────────────────────────────
         public bool HandleMouseEvent(TerminalMouseEvent e)
         {
+            if (e.Type == MouseEventType.Scroll) return OnMouseScroll(e);
             if (e.Button != MouseButton.Left) return false;
             switch (e.Type)
             {
@@ -518,6 +546,20 @@ namespace RatatuiUnity
                     return OnMouseClick(e);
                 default: return false;
             }
+        }
+
+        // Mouse wheel scrolls the view by one line per notch without moving the
+        // cursor. ScrollDelta > 0 = wheel up = reveal earlier lines.
+        private bool OnMouseScroll(TerminalMouseEvent e)
+        {
+            int viewH = Math.Max(1, _lastAreaH);
+            int maxScroll = Math.Max(0, LineCount - viewH);
+            if (maxScroll == 0) return false;
+            int step = e.ScrollDelta > 0f ? -1 : 1;
+            int target = Mathf.Clamp(_scrollLine + step, 0, maxScroll);
+            if (target == _scrollLine) return false;
+            _scrollLine = target;
+            return true;
         }
 
         private bool OnMouseClick(TerminalMouseEvent e)
@@ -662,13 +704,13 @@ namespace RatatuiUnity
         {
             if (focused) SyncMobileKeyboard();
             _lastAreaId = areaId;
+            _textSubAreaId = areaId; _vbarAreaId = 0; _hbarAreaId = 0;
             if (!term.TryGetAreaRect(areaId, out int ax, out int ay, out int aw, out int ah)
                 || aw <= 0 || ah <= 0)
             {
                 _lastAreaX = 0; _lastAreaY = 0; _lastAreaW = 0; _lastAreaH = 0;
                 return;
             }
-            _lastAreaX = ax; _lastAreaY = ay; _lastAreaW = aw; _lastAreaH = ah;
 
             if (fg.a < 0.01f)            fg            = Color.white;
             if (cursorFg.a < 0.01f)      cursorFg      = Color.black;
@@ -677,12 +719,67 @@ namespace RatatuiUnity
             if (selectionBg.a < 0.01f)   selectionBg   = new Color(0.2f, 0.4f, 0.8f);
             if (placeholderFg.a < 0.01f) placeholderFg = new Color(0.45f, 0.45f, 0.45f);
 
-            EnsureCursorVisible(ah);
+            uint textArea = areaId;
+            uint vbarArea = 0;
+            uint hbarArea = 0;
+            bool needV = false;
+            bool needH = false;
+            int lineCount = 0;
+            int cursorLineWidth = 0;
+            var (cursorLine, _) = IndexToLineCol(_cursor);
 
-            // Empty placeholder
+            if (_value.Length > 0 && aw > 1 && ah > 1)
+            {
+                lineCount = LineCount;
+                int cursorLineStart = LineStartIdx(cursorLine);
+                int cursorLineEnd = LineEndIdx(cursorLine);
+                cursorLineWidth = TextUtils.DisplayWidth(_value, cursorLineStart, cursorLineEnd);
+
+                needV = lineCount > ah;
+                int textWForH = aw - (needV ? 1 : 0);
+                needH = cursorLineWidth > textWForH && textWForH > 0;
+                int textHForV = ah - (needH ? 1 : 0);
+                needV = lineCount > textHForV && textHForV > 0;
+
+                if (needV)
+                {
+                    var cols = term.Split(areaId, Direction.Horizontal,
+                        Constraint.Min(1), Constraint.Length(1));
+                    if (cols.Length >= 2) { textArea = cols[0]; vbarArea = cols[1]; }
+                    else needV = false;
+                }
+                if (needH)
+                {
+                    var rows = term.Split(textArea, Direction.Vertical,
+                        Constraint.Min(1), Constraint.Length(1));
+                    if (rows.Length >= 2) { textArea = rows[0]; hbarArea = rows[1]; }
+                    else needH = false;
+                }
+
+                _textSubAreaId = textArea; _vbarAreaId = vbarArea; _hbarAreaId = hbarArea;
+            }
+
+            if (!term.TryGetAreaRect(textArea, out int tx, out int ty, out int textW, out int textH)
+                || textW <= 0 || textH <= 0)
+            {
+                _lastAreaX = ax; _lastAreaY = ay; _lastAreaW = aw; _lastAreaH = ah;
+                return;
+            }
+            _lastAreaX = tx; _lastAreaY = ty; _lastAreaW = textW; _lastAreaH = textH;
+
+            // Only follow the cursor when it actually moved. Mouse-wheel scrolling
+            // changes _scrollLine without touching the cursor, so the view stays
+            // put instead of snapping back to the cursor every frame.
+            if (_cursor != _lastEnsuredCursor)
+            {
+                EnsureCursorVisible(textH);
+                _lastEnsuredCursor = _cursor;
+            }
+
+            // Empty placeholder — no scrollbars.
             if (_value.Length == 0)
             {
-                var pb = term.BeginStyledParagraph(areaId, Alignment.Left, wrap: false);
+                var pb = term.BeginStyledParagraph(textArea, Alignment.Left, wrap: false);
                 string ph = Placeholder ?? "";
                 if (focused && CursorVisible())
                 {
@@ -698,13 +795,10 @@ namespace RatatuiUnity
                 return;
             }
 
-            var b = term.BeginStyledParagraph(areaId, Alignment.Left, wrap: false);
-
-            int lineCount = LineCount;
-            var (cursorLine, _) = IndexToLineCol(_cursor);
+            var b = term.BeginStyledParagraph(textArea, Alignment.Left, wrap: false);
             _hScrollLine = -1;
 
-            for (int relLine = 0; relLine < ah; relLine++)
+            for (int relLine = 0; relLine < textH; relLine++)
             {
                 int line = _scrollLine + relLine;
                 if (line >= lineCount) break;
@@ -718,23 +812,44 @@ namespace RatatuiUnity
                 if (line == cursorLine)
                 {
                     int cursorColInLine = TextUtils.DisplayWidth(_value, lineStart, _cursor);
-                    if (cursorColInLine >= aw)
+                    if (cursorColInLine >= textW)
                     {
-                        int targetStartCol = cursorColInLine - aw + 1;
+                        int targetStartCol = cursorColInLine - textW + 1;
                         renderStart = IndexAfterColumn(lineStart, lineEnd, targetStartCol - 1);
                         _hScrollLine = line;
                         _hScrollStartIdx = renderStart;
                     }
                 }
 
-                int visEnd = ClipLineToWidth(renderStart, lineEnd, aw);
+                int visEnd = ClipLineToWidth(renderStart, lineEnd, textW);
                 RenderLineContent(b, renderStart, visEnd, lineEnd, focused, fg, bg, cursorFg, cursorBg, selectionFg, selectionBg);
 
-                if (relLine + 1 < ah && line + 1 < lineCount)
+                if (relLine + 1 < textH && line + 1 < lineCount)
                     b.Line();
             }
 
             b.Render();
+
+            if (needV || needH)
+            {
+                term.SetStyle(fg, Color.clear, Modifier.None);
+                if (needV && vbarArea != 0)
+                {
+                    term.Scrollbar(vbarArea, lineCount, _scrollLine, textH,
+                        ScrollbarOrientation.VerticalRight, autoHide: true);
+                }
+                if (needH && hbarArea != 0)
+                {
+                    int hStartCol = 0;
+                    if (_hScrollLine == cursorLine)
+                    {
+                        int cursorLineStart = LineStartIdx(cursorLine);
+                        hStartCol = TextUtils.DisplayWidth(_value, cursorLineStart, _hScrollStartIdx);
+                    }
+                    term.Scrollbar(hbarArea, cursorLineWidth, hStartCol, textW,
+                        ScrollbarOrientation.HorizontalBottom, autoHide: true);
+                }
+            }
         }
 
         private int ClipLineToWidth(int lineStart, int lineEnd, int width)

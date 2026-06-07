@@ -93,6 +93,14 @@ namespace RatatuiUnity.Demo
         // ── Mouse ────────────────────────────────────────────────────────
         public void OnMouseEvent(TerminalMouseEvent e)
         {
+            // Scroll routes to the field under the cursor regardless of focus.
+            if (e.Type == MouseEventType.Scroll)
+            {
+                int hit = HitField(e.AreaId);
+                if (hit >= 0) DispatchMouse(hit, e);
+                return;
+            }
+
             if (e.Button != MouseButton.Left) return;
 
             // On Down: hit-test area, change focus, forward event.
@@ -114,6 +122,9 @@ namespace RatatuiUnity.Demo
         {
             for (int i = 0; i < _areas.Length; i++)
                 if (areaId == _areas[i]) return i;
+            // The textarea splits its inner area for scrollbars, so hit-testing
+            // may resolve to a sub-area the loop above does not track.
+            if (_note.OwnsArea(areaId)) return 4;
             return -1;
         }
 

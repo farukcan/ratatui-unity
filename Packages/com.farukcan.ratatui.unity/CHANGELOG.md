@@ -7,6 +7,9 @@ All notable changes to this package will be documented in this file.
 ### Added
 - **OnGUI display modes** on `RatatuiRenderer`: `Full` (stretch to entire screen), `Partial` (native texture size with horizontal/vertical alignment), and `Window` (draggable macOS-style chrome).
 - **Window mode title bar** shows the host GameObject name (same as the object name in the Hierarchy).
+- **`TerminalTextArea` scrollbars**: auto-hide vertical and horizontal scrollbars when content exceeds the viewport; the text area shrinks by one column/row internally so scrollbars do not overlap text.
+- **`TerminalTextArea` mouse-wheel scrolling**: the wheel scrolls the view one line per notch without moving the cursor; the view only re-centers on the cursor when the cursor itself moves.
+- **`TerminalTextArea.OwnsArea`**: reports whether an area id belongs to the widget (outer area or scrollbar sub-areas) so callers can route clicks/scrolls correctly even when hit-testing resolves to a split sub-area.
 
 ### Fixed
 - Pixel buffer is now flipped vertically before upload so Unity's `Texture2D.LoadRawTextureData` (bottom-to-top / OpenGL row order) displays the terminal the right way up.
