@@ -413,6 +413,65 @@ namespace UnityEngine
         public static int touchCount => 0;
     }
 
+    public static class GUIUtility
+    {
+        public static string systemCopyBuffer { get; set; }
+    }
+
+    public enum TouchScreenKeyboardType
+    {
+        Default,
+        ASCIICapable,
+        NumbersAndPunctuation,
+        URL,
+        NumberPad,
+        PhonePad,
+        NamePhonePad,
+        EmailAddress,
+        NintendoNetworkAccount,
+        Social,
+        Search,
+        DecimalPad,
+        OneTimeCode,
+    }
+
+    public struct RangeInt
+    {
+        public int start;
+        public int length;
+    }
+
+    public sealed class TouchScreenKeyboard
+    {
+        public enum Status
+        {
+            Hidden,
+            Done,
+            Canceled,
+            LostFocus,
+        }
+
+        public static bool isSupported => false;
+        public static bool visible => false;
+        public bool active { get; set; }
+        public string text { get; set; }
+        public RangeInt selection { get; set; }
+        public Status status { get; set; }
+
+        public static TouchScreenKeyboard Open(
+            string text,
+            TouchScreenKeyboardType keyboardType,
+            bool autocorrection,
+            bool multiline,
+            bool secure,
+            bool alert,
+            string textPlaceholder,
+            int characterLimit)
+        {
+            return new TouchScreenKeyboard();
+        }
+    }
+
     [AttributeUsage(AttributeTargets.Field)]
     public class SerializeFieldAttribute : Attribute { }
 

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 
 namespace RatatuiUnity.Samples.Console
@@ -31,8 +30,12 @@ namespace RatatuiUnity.Samples.Console
         private const int TouchToggleFingerCount = 4;
         private int _touchSessionMaxCount;
 
-        private readonly StringBuilder _promptBuffer = new StringBuilder(128);
-        private readonly StringBuilder _searchBuffer = new StringBuilder(64);
+        // Editable buffers built on TerminalInput — give us selection, clipboard,
+        // undo/redo, Cmd/Ctrl shortcuts, horizontal scroll, and mobile IME for free.
+        // Console-specific keys (Enter/Tab/Esc/↑↓) are published as events that we
+        // wire to history navigation, completion, and submit in InitInputWiring().
+        private readonly TerminalCommandInput _prompt = new TerminalCommandInput();
+        private readonly TerminalCommandInput _search = new TerminalCommandInput();
 
         private Filter _filter = Filter.All;
         private readonly List<int> _visibleIndices = new List<int>(256);
@@ -105,6 +108,49 @@ namespace RatatuiUnity.Samples.Console
             if (_config == null) _config = RatatuiConsoleConfig.CreateDefault();
             ApplyConfigToBase(_config);
             base.Awake();
+            InitInputWiring();
+        }
+
+        private void InitInputWiring()
+        {
+            _prompt.Prefix      = "> ";
+            // Console behavior: focusing the field (open, F7 swap, mouse click) must
+            // preserve the cursor, not nuke the half-typed command. TerminalInput's
+            // default (select-all on focus) is right for one-shot form fields, wrong
+            // for a REPL prompt.
+            _prompt.Input.SelectAllOnFocus = false;
+            _search.Input.SelectAllOnFocus = false;
+
+            _prompt.OnSubmit       += SubmitPromptOrToggleDetail;
+            _prompt.OnEscape       += OnPromptEscape;
+            _prompt.OnTab          += ApplyTopSuggestion;
+            _prompt.OnHistoryStep  += OnPromptHistoryStep;
+            _prompt.OnEdit         += () => RatatuiConsole.History.Reset();
+
+            _search.Placeholder = "SEARCH LOGS...";
+            _search.OnSubmit += () => SetFocus(InputFocus.Prompt);
+            _search.OnEscape += () => SetFocus(InputFocus.Prompt);
+        }
+
+        private void OnPromptEscape()
+        {
+            if (_detailOpen) { _detailOpen = false; return; }
+            SetOpen(false);
+        }
+
+        private void OnPromptHistoryStep(int dir)
+        {
+            if (dir < 0) NavigateUp(); else NavigateDown();
+        }
+
+        private void SetFocus(InputFocus next)
+        {
+            if (_focus == next) return;
+            // Drive the underlying input's focus lifecycle so the mobile IME
+            // opens/closes alongside the renderer's logical focus state.
+            if (_focus == InputFocus.Prompt) _prompt.OnBlur(); else _search.OnBlur();
+            _focus = next;
+            if (next == InputFocus.Prompt) _prompt.OnFocus(); else _search.OnFocus();
         }
 
         protected override void Update()
@@ -141,6 +187,7 @@ namespace RatatuiUnity.Samples.Console
                 // take scene focus immediately so typing works without a click first.
                 RequestFocus();
                 _focus = InputFocus.Prompt;
+                _prompt.OnFocus();
 
                 // The area_map is stale or empty after a closed period; ignore mouse
                 // events for one frame so the next BuildFrame can populate it before
@@ -151,6 +198,8 @@ namespace RatatuiUnity.Samples.Console
             }
             else
             {
+                _prompt.OnBlur();
+                _search.OnBlur();
                 ClearSuggestions();
             }
         }
@@ -290,24 +339,18 @@ namespace RatatuiUnity.Samples.Console
         {
             bool focused = _focus == InputFocus.Search;
             bool hover = IsHovering(area);
-            string text = _searchBuffer.Length > 0 ? _searchBuffer.ToString() : "";
             Color hintColor = hover ? ColorButtonHi : new Color(0.6f, 0.85f, 1.0f);
             Color bg = hover ? ColorHoverBg : Color.clear;
 
-            var sp = term.BeginStyledParagraph(area, Alignment.Left, false)
-                .Span(" (F7) ", fg: hintColor, bg: bg, modifiers: Modifier.Bold);
-
-            if (text.Length == 0)
-            {
-                sp.Span("SEARCH LOGS...", fg: focused ? ColorPromptText : ColorPromptDim,
-                    bg: bg, modifiers: focused ? Modifier.None : Modifier.Dim);
-            }
-            else
-            {
-                sp.Span(text, fg: ColorPromptText, bg: bg);
-            }
-            if (focused) sp.Span("_", fg: ColorPromptText, bg: bg, modifiers: Modifier.Bold);
-            sp.Render();
+            _search.Prefix = " (F7) ";
+            _search.PrefixFg = hintColor;
+            _search.PrefixBg = bg;
+            _search.Render(term, area,
+                fg: ColorPromptText, bg: bg,
+                cursorFg: Color.black, cursorBg: ColorPromptText,
+                selectionFg: Color.white, selectionBg: ColorSelectionBg,
+                placeholderFg: focused ? ColorPromptText : ColorPromptDim,
+                focused: focused);
         }
 
         // ── Body (Log list + optional Detail panel) ──────────────────────────
@@ -671,15 +714,17 @@ namespace RatatuiUnity.Samples.Console
 
             bool focused = _focus == InputFocus.Prompt;
             bool hover = IsHovering(_promptArea);
-            bool cursorOn = focused && ((int)(Time.unscaledTime * 2f) % 2 == 0);
             Color bg = hover ? ColorHoverBg : Color.clear;
             Color prefixColor = focused || hover ? ColorButtonHi : ColorPromptDim;
 
-            var sp = term.BeginStyledParagraph(inner, Alignment.Left, false)
-                .Span("> ", fg: prefixColor, bg: bg, modifiers: Modifier.Bold)
-                .Span(_promptBuffer.ToString(), fg: ColorPromptText, bg: bg);
-            if (cursorOn) sp.Span("_", fg: ColorPromptText, bg: bg, modifiers: Modifier.Bold);
-            sp.Render();
+            _prompt.PrefixFg = prefixColor;
+            _prompt.PrefixBg = bg;
+            _prompt.Render(term, inner,
+                fg: ColorPromptText, bg: bg,
+                cursorFg: Color.black, cursorBg: ColorPromptText,
+                selectionFg: Color.white, selectionBg: ColorSelectionBg,
+                placeholderFg: ColorPromptDim,
+                focused: focused);
         }
 
         // ── Filter / Search Cache ────────────────────────────────────────────
@@ -688,7 +733,7 @@ namespace RatatuiUnity.Samples.Console
         {
             var capture = RatatuiConsole.Logs;
             int gen = capture?.Generation ?? 0;
-            string search = _searchBuffer.Length > 0 ? _searchBuffer.ToString() : string.Empty;
+            string search = _search.Text ?? string.Empty;
 
             bool filterChanged = _filter != _filterCacheFilter || search != _filterCacheSearch;
             if (gen == _filterCacheGeneration && !filterChanged) return;
@@ -796,7 +841,7 @@ namespace RatatuiUnity.Samples.Console
 
         private void RebuildSuggestionsIfNeeded()
         {
-            string text = _promptBuffer.ToString();
+            string text = _prompt.Text ?? string.Empty;
             _suggestions.Clear();
             if (_focus == InputFocus.Prompt && text.Length > 0)
             {
@@ -854,15 +899,15 @@ namespace RatatuiUnity.Samples.Console
                 case KeyCode.F5: _filter = Filter.Errors; _logScroll = 0; return;
                 case KeyCode.F6: _filter = Filter.Exceptions; _logScroll = 0; return;
                 case KeyCode.F7:
-                    _focus = _focus == InputFocus.Search ? InputFocus.Prompt : InputFocus.Search;
+                    SetFocus(_focus == InputFocus.Search ? InputFocus.Prompt : InputFocus.Search);
                     return;
             }
 
             if (e.Key == KeyCode.PageUp) { MoveLogSelection(-1); return; }
             if (e.Key == KeyCode.PageDown) { MoveLogSelection(1); return; }
 
-            if (_focus == InputFocus.Search) HandleSearchKey(e);
-            else HandlePromptKey(e);
+            if (_focus == InputFocus.Search) _search.HandleKeyEvent(e);
+            else                              _prompt.HandleKeyEvent(e);
         }
 
         private static bool IsToggleKeyCharacter(KeyCode key, char c)
@@ -873,58 +918,6 @@ namespace RatatuiUnity.Samples.Console
                 case KeyCode.Tilde: return c == '~';
                 default: return false;
             }
-        }
-
-        private void HandlePromptKey(TerminalKeyEvent e)
-        {
-            switch (e.Key)
-            {
-                case KeyCode.Tab:
-                    ApplyTopSuggestion();
-                    return;
-                case KeyCode.Return:
-                case KeyCode.KeypadEnter:
-                    SubmitPromptOrToggleDetail();
-                    return;
-                case KeyCode.Escape:
-                    if (_detailOpen) { _detailOpen = false; return; }
-                    SetOpen(false);
-                    return;
-                case KeyCode.Backspace:
-                    if (_promptBuffer.Length > 0)
-                        _promptBuffer.Length--;
-                    RatatuiConsole.History.Reset();
-                    return;
-                case KeyCode.UpArrow:
-                    NavigateUp();
-                    return;
-                case KeyCode.DownArrow:
-                    NavigateDown();
-                    return;
-            }
-            if (e.Character != '\0' && !char.IsControl(e.Character))
-            {
-                _promptBuffer.Append(e.Character);
-                RatatuiConsole.History.Reset();
-            }
-        }
-
-        private void HandleSearchKey(TerminalKeyEvent e)
-        {
-            switch (e.Key)
-            {
-                case KeyCode.Return:
-                case KeyCode.KeypadEnter:
-                case KeyCode.Escape:
-                    _focus = InputFocus.Prompt;
-                    return;
-                case KeyCode.Backspace:
-                    if (_searchBuffer.Length > 0)
-                        _searchBuffer.Length--;
-                    return;
-            }
-            if (e.Character != '\0' && !char.IsControl(e.Character))
-                _searchBuffer.Append(e.Character);
         }
 
         protected override void OnTerminalMouseEvent(TerminalMouseEvent e)
@@ -938,6 +931,31 @@ namespace RatatuiUnity.Samples.Console
                 HandleScroll(e);
                 return;
             }
+
+            // Route Down/Move/Up/Click on the input areas to the widgets so they
+            // get click-to-position-cursor and drag-to-select. A Down also pulls
+            // logical focus so the next keystroke goes to the same field.
+            if (e.AreaId == _promptArea && e.Button == MouseButton.Left)
+            {
+                if (e.Type == MouseEventType.Down) SetFocus(InputFocus.Prompt);
+                _prompt.HandleMouseEvent(e);
+                return;
+            }
+            if (e.AreaId == _searchArea && e.Button == MouseButton.Left)
+            {
+                if (e.Type == MouseEventType.Down) SetFocus(InputFocus.Search);
+                _search.HandleMouseEvent(e);
+                return;
+            }
+            // Drag-selection continues after the cursor leaves the input area, so
+            // forward Move/Up to the focused widget regardless of AreaId.
+            if ((e.Type == MouseEventType.Move || e.Type == MouseEventType.Up)
+                && e.Button == MouseButton.Left)
+            {
+                if (_focus == InputFocus.Prompt && _prompt.HandleMouseEvent(e)) return;
+                if (_focus == InputFocus.Search && _search.HandleMouseEvent(e)) return;
+            }
+
             if (e.Type != MouseEventType.Click || e.Button != MouseButton.Left) return;
 
             uint a = e.AreaId;
@@ -948,7 +966,6 @@ namespace RatatuiUnity.Samples.Console
             if (a == _tabWarnsArea) { _filter = Filter.Warnings; _logScroll = 0; return; }
             if (a == _tabErrsArea) { _filter = Filter.Errors; _logScroll = 0; return; }
             if (a == _tabExcArea) { _filter = Filter.Exceptions; _logScroll = 0; return; }
-            if (a == _searchArea) { _focus = InputFocus.Search; return; }
 
             if (a == _detailCopyArea) { CopySelectedStackTrace(); return; }
             if (a == _detailEmailArea) { EmailSelectedLog(); return; }
@@ -964,11 +981,6 @@ namespace RatatuiUnity.Samples.Console
             {
                 SelectSuggestionAtScreenRow(e.Row);
                 return;
-            }
-
-            if (a == _promptArea)
-            {
-                _focus = InputFocus.Prompt;
             }
         }
 
@@ -1031,13 +1043,13 @@ namespace RatatuiUnity.Samples.Console
 
         private void SubmitPromptOrToggleDetail()
         {
-            if (_promptBuffer.Length == 0)
+            string raw = _prompt.Text ?? string.Empty;
+            if (raw.Length == 0)
             {
                 if (_selectedEntryIndex >= 0) _detailOpen = !_detailOpen;
                 return;
             }
-            string raw = _promptBuffer.ToString();
-            _promptBuffer.Length = 0;
+            SetPromptText(string.Empty);
             RatatuiConsole.History.Push(raw);
             RatatuiConsole.ExecuteCommand(raw);
             ClearSuggestions();
@@ -1049,13 +1061,16 @@ namespace RatatuiUnity.Samples.Console
             int idx = Mathf.Clamp(_suggestionIndex, 0, _suggestions.Count - 1);
             var s = _suggestions[idx];
 
-            if (s.ReplaceFromIndex < 0)
-                _promptBuffer.Length = 0;
-            else
-                _promptBuffer.Length = Mathf.Clamp(s.ReplaceFromIndex, 0, _promptBuffer.Length);
-
-            _promptBuffer.Append(s.Insert);
-            if (s.TrailingSpace) _promptBuffer.Append(' ');
+            string cur = _prompt.Text ?? string.Empty;
+            string head = s.ReplaceFromIndex < 0
+                ? string.Empty
+                : cur.Substring(0, Mathf.Clamp(s.ReplaceFromIndex, 0, cur.Length));
+            string next = head + s.Insert + (s.TrailingSpace ? " " : string.Empty);
+            SetPromptText(next);
+            // Direct Value writes bypass HandleKeyEvent's diff, so OnEdit doesn't
+            // fire — invoke History.Reset() explicitly to match the "user just
+            // edited the buffer" semantics.
+            RatatuiConsole.History.Reset();
             ClearSuggestions();
         }
 
@@ -1066,15 +1081,14 @@ namespace RatatuiUnity.Samples.Console
                 _suggestionIndex = (_suggestionIndex - 1 + _suggestions.Count) % _suggestions.Count;
                 return;
             }
-            if (_promptBuffer.Length == 0)
+            if ((_prompt.Text ?? string.Empty).Length == 0)
             {
                 MoveLogSelection(-1);
                 return;
             }
             string hist = RatatuiConsole.History.MovePrev();
             if (hist == null) return;
-            _promptBuffer.Length = 0;
-            _promptBuffer.Append(hist);
+            SetPromptText(hist);
         }
 
         private void NavigateDown()
@@ -1084,15 +1098,23 @@ namespace RatatuiUnity.Samples.Console
                 _suggestionIndex = (_suggestionIndex + 1) % _suggestions.Count;
                 return;
             }
-            if (_promptBuffer.Length == 0)
+            if ((_prompt.Text ?? string.Empty).Length == 0)
             {
                 MoveLogSelection(1);
                 return;
             }
             string hist = RatatuiConsole.History.MoveNext();
             if (hist == null) return;
-            _promptBuffer.Length = 0;
-            _promptBuffer.Append(hist);
+            SetPromptText(hist);
+        }
+
+        // Replaces the prompt buffer and parks the cursor at the end. Value setter
+        // clears selection and resets undo history, which is what we want when an
+        // external action (submit/history/completion) rewrites the input.
+        private void SetPromptText(string text)
+        {
+            _prompt.Text = text ?? string.Empty;
+            _prompt.Cursor = _prompt.Text.Length;
         }
 
         private int GetSelectedVisIndex()

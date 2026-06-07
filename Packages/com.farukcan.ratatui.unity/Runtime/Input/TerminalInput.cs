@@ -61,6 +61,12 @@ namespace RatatuiUnity
         public TouchScreenKeyboardType KeyboardType { get; set; } = TouchScreenKeyboardType.Default;
         /// <summary>Enable native autocorrection on the virtual keyboard.</summary>
         public bool AutoCorrection { get; set; } = false;
+        /// <summary>Fixed text drawn before the editable buffer (e.g. "> "). Not part of Value; not editable; ignored by selection/cursor logic. Empty disables.</summary>
+        public string Prefix { get; set; } = string.Empty;
+        /// <summary>Foreground color of <see cref="Prefix"/>. Transparent (default) falls back to the body fg color.</summary>
+        public Color PrefixFg { get; set; }
+        /// <summary>Background color of <see cref="Prefix"/>. Transparent (default) falls back to the body bg color.</summary>
+        public Color PrefixBg { get; set; }
 
         // Mobile virtual keyboard bridge — no-op on platforms without TouchScreenKeyboard.
         private readonly MobileKeyboardBridge _mobileKb = new MobileKeyboardBridge();
@@ -577,9 +583,12 @@ namespace RatatuiUnity
             return true;
         }
 
+        private int PrefixWidth() =>
+            string.IsNullOrEmpty(Prefix) ? 0 : TextUtils.DisplayWidth(Prefix, 0, Prefix.Length);
+
         private int ColToIndex(int absCol)
         {
-            int localCol = absCol - _lastAreaX;
+            int localCol = absCol - _lastAreaX - PrefixWidth();
             if (localCol < 0) localCol = 0;
             int i = _scrollIdx;
             int col = 0;
@@ -633,7 +642,6 @@ namespace RatatuiUnity
                 return;
             }
             _lastAreaX = ax;
-            int width = aw;
 
             if (fg.a < 0.01f)            fg            = Color.white;
             if (cursorFg.a < 0.01f)      cursorFg      = Color.black;
@@ -642,10 +650,18 @@ namespace RatatuiUnity
             if (selectionBg.a < 0.01f)   selectionBg   = new Color(0.2f, 0.4f, 0.8f);
             if (placeholderFg.a < 0.01f) placeholderFg = new Color(0.45f, 0.45f, 0.45f);
 
+            // Carve the prefix off the front of the area. The remaining `width`
+            // is what value/cursor logic gets to draw into.
+            int prefixW = PrefixWidth();
+            if (prefixW >= aw) return;
+            int width = aw - prefixW;
+            Color pfg = PrefixFg.a < 0.01f ? fg : PrefixFg;
+            Color pbg = PrefixBg.a < 0.01f ? bg : PrefixBg;
+
             // Placeholder branch: empty value
             if (_value.Length == 0)
             {
-                RenderPlaceholder(term, areaId, width, fg, bg, cursorFg, cursorBg, placeholderFg, focused);
+                RenderPlaceholder(term, areaId, width, fg, bg, cursorFg, cursorBg, placeholderFg, focused, pfg, pbg);
                 return;
             }
 
@@ -657,6 +673,7 @@ namespace RatatuiUnity
             bool hasSelInView = HasSelection && selE > selS;
 
             var b = term.BeginStyledParagraph(areaId, Alignment.Left, wrap: false);
+            if (prefixW > 0) b.Span(Prefix, pfg, pbg);
 
             if (hasSelInView)
             {
@@ -693,9 +710,11 @@ namespace RatatuiUnity
 
         private void RenderPlaceholder(
             RatatuiTerminal term, uint areaId, int width,
-            Color fg, Color bg, Color cursorFg, Color cursorBg, Color placeholderFg, bool focused)
+            Color fg, Color bg, Color cursorFg, Color cursorBg, Color placeholderFg, bool focused,
+            Color prefixFg, Color prefixBg)
         {
             var b = term.BeginStyledParagraph(areaId, Alignment.Left, wrap: false);
+            if (!string.IsNullOrEmpty(Prefix)) b.Span(Prefix, prefixFg, prefixBg);
             string ph = Placeholder ?? string.Empty;
             if (ph.Length > width) ph = ph.Substring(0, width);
 
@@ -710,9 +729,10 @@ namespace RatatuiUnity
             {
                 b.Span(ph, placeholderFg, bg);
             }
-            else
+            else if (string.IsNullOrEmpty(Prefix))
             {
                 // Ensure at least one span — native panics on empty styled paragraphs.
+                // Skipped when a prefix already provided that span.
                 b.Span(" ", fg, bg);
             }
             b.Render();
