@@ -61,14 +61,6 @@ public class ESP32Terminal : RatatuiRenderer
         AddLog("I", "Type 'help' for commands");
     }
 
-    private void Start()
-    {
-        // Input field is always active in this sample — claim keyboard focus
-        // explicitly so the user can type immediately, even if other renderers
-        // exist in the scene and registered after us.
-        RequestFocus();
-    }
-
     protected override void Update()
     {
         float dt = Time.deltaTime;
@@ -181,7 +173,7 @@ public class ESP32Terminal : RatatuiRenderer
             return;
         }
 
-        if (e.Key == KeyCode.PageUp)   { _logScroll = Mathf.Min(_logScroll + 5, Mathf.Max(0, _logCount - 1)); return; }
+        if (e.Key == KeyCode.PageUp) { _logScroll = Mathf.Min(_logScroll + 5, Mathf.Max(0, _logCount - 1)); return; }
         if (e.Key == KeyCode.PageDown) { _logScroll = Mathf.Max(_logScroll - 5, 0); return; }
 
         _cmdInput.HandleKeyEvent(e);
@@ -324,7 +316,7 @@ public class ESP32Terminal : RatatuiRenderer
                 "W" => Color.yellow,
                 "E" => Color.red,
                 ">" => Color.cyan,
-                _   => new Color(0.6f, 0.8f, 0.6f),
+                _ => new Color(0.6f, 0.8f, 0.6f),
             };
             builder.SpanLine(_logBuffer[i], lineColor);
         }
