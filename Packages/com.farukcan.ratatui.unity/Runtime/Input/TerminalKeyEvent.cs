@@ -8,6 +8,7 @@ namespace RatatuiUnity
         Shift = 1,
         Ctrl  = 2,
         Alt   = 4,
+        Cmd   = 8,  // macOS Command / Apple key
     }
 
     /// <summary>
@@ -38,6 +39,14 @@ namespace RatatuiUnity
         public bool HasShift => (Modifiers & KeyModifiers.Shift) != 0;
         public bool HasCtrl  => (Modifiers & KeyModifiers.Ctrl)  != 0;
         public bool HasAlt   => (Modifiers & KeyModifiers.Alt)   != 0;
+        public bool HasCmd   => (Modifiers & KeyModifiers.Cmd)   != 0;
+
+        /// <summary>
+        /// True when the primary command modifier for the current platform is held.
+        /// On macOS this is Cmd; on other platforms this is Ctrl. Use this for
+        /// clipboard/undo/select-all shortcuts so they feel native everywhere.
+        /// </summary>
+        public bool HasCmdOrCtrl => HasCmd || HasCtrl;
 
         public override string ToString()
             => Character != '\0'

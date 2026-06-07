@@ -321,6 +321,11 @@ namespace RatatuiUnity
             KeyCode.F1,  KeyCode.F2,  KeyCode.F3,  KeyCode.F4,
             KeyCode.F5,  KeyCode.F6,  KeyCode.F7,  KeyCode.F8,
             KeyCode.F9,  KeyCode.F10, KeyCode.F11, KeyCode.F12,
+            // Shortcut letters — needed because Input.inputString does NOT emit a
+            // printable char when Cmd (macOS) or Ctrl is held, so widgets relying
+            // on the key event for Copy/Cut/Paste/SelectAll/Undo/Redo would never
+            // see the keystroke without these tracked KeyCodes.
+            KeyCode.A, KeyCode.C, KeyCode.V, KeyCode.X, KeyCode.Y, KeyCode.Z,
         };
 
         // ── Unity Lifecycle ───────────────────────────────────────────────────
@@ -550,6 +555,13 @@ namespace RatatuiUnity
                 mods |= KeyModifiers.Ctrl;
             if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt))
                 mods |= KeyModifiers.Alt;
+            // macOS Command key only. LeftApple/RightApple are the legacy KeyCodes
+            // that alias LeftCommand/RightCommand — check both for compatibility.
+            // The Windows Super key is deliberately NOT mapped to Cmd: Win+letter
+            // combos are reserved by the OS and would conflict with Copy/Paste.
+            if (Input.GetKey(KeyCode.LeftCommand) || Input.GetKey(KeyCode.RightCommand)
+             || Input.GetKey(KeyCode.LeftApple)   || Input.GetKey(KeyCode.RightApple))
+                mods |= KeyModifiers.Cmd;
             return mods;
         }
 

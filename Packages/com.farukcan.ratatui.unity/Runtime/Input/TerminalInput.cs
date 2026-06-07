@@ -57,6 +57,13 @@ namespace RatatuiUnity
         public bool SelectAllOnFocus { get; set; } = true;
         /// <summary>Cursor blink half-period in seconds. ≤ 0 disables blink.</summary>
         public float BlinkPeriod { get; set; } = 0.5f;
+        /// <summary>Virtual keyboard layout requested on iOS / Android / mobile WebGL.</summary>
+        public TouchScreenKeyboardType KeyboardType { get; set; } = TouchScreenKeyboardType.Default;
+        /// <summary>Enable native autocorrection on the virtual keyboard.</summary>
+        public bool AutoCorrection { get; set; } = false;
+
+        // Mobile virtual keyboard bridge — no-op on platforms without TouchScreenKeyboard.
+        private readonly MobileKeyboardBridge _mobileKb = new MobileKeyboardBridge();
 
         // ── Public read-only state ───────────────────────────────────────
         public string Value
@@ -69,6 +76,7 @@ namespace RatatuiUnity
                 if (_anchor > _value.Length) _anchor = -1;
                 ResetHistory();
                 ResetBlink();
+                _mobileKb.PushText(_value);
             }
         }
 
@@ -103,9 +111,69 @@ namespace RatatuiUnity
         {
             if (SelectAllOnFocus) SelectAll();
             ResetBlink();
+            OpenMobileKeyboard();
         }
 
-        public void OnBlur() => ClearSelection();
+        public void OnBlur()
+        {
+            ClearSelection();
+            _mobileKb.Close();
+        }
+
+        private void OpenMobileKeyboard()
+        {
+            if (ReadOnly) return;
+            _mobileKb.Open(
+                initialText: _value,
+                multiline: false,
+                secure: MaskChar.HasValue,
+                placeholder: Placeholder,
+                characterLimit: MaxLength,
+                type: KeyboardType,
+                autocorrection: AutoCorrection);
+        }
+
+        // Pulls text from the native virtual keyboard into the widget. Called
+        // automatically from Render() when focused; safe to call elsewhere.
+        public void SyncMobileKeyboard()
+        {
+            if (!_mobileKb.Poll(out string text, out int caret, out bool closed)) return;
+            if (text != null) ApplyMobileKeyboardText(text, caret);
+            if (closed) ClearSelection();
+        }
+
+        private void ApplyMobileKeyboardText(string text, int caret)
+        {
+            if (ReadOnly) return;
+            // Single-line: collapse any newline that snuck through the IME.
+            text = text.Replace("\r\n", " ").Replace("\r", " ").Replace("\n", " ");
+
+            if (CharFilter != null)
+            {
+                var sb = new System.Text.StringBuilder(text.Length);
+                foreach (char c in text) if (CharFilter(c)) sb.Append(c);
+                // Filtering can shorten the buffer — clamp the IME caret too.
+                if (sb.Length != text.Length && caret > sb.Length) caret = sb.Length;
+                text = sb.ToString();
+            }
+            if (text.Length > MaxLength)
+            {
+                text = text.Substring(0, MaxLength);
+                if (caret > text.Length) caret = text.Length;
+            }
+
+            if (text == _value && caret == _cursor) return;
+            // Coalesce contiguous IME edits into a single undo step.
+            var kind = text.Length >= _value.Length ? EditKind.Insert : EditKind.DeleteBack;
+            _value = text;
+            _cursor = Mathf.Clamp(caret, 0, _value.Length);
+            _anchor = -1;
+            ResetBlink();
+            PushHistory(kind);
+            // If filtering/clamping rewrote the buffer, push the canonical
+            // version back so the IME stays in sync.
+            _mobileKb.PushText(text);
+        }
 
         // ── Selection ────────────────────────────────────────────────────
         public void SelectAll()
@@ -386,10 +454,12 @@ namespace RatatuiUnity
         // ── Key handling ─────────────────────────────────────────────────
         public bool HandleKeyEvent(TerminalKeyEvent e)
         {
-            // Ctrl-shortcuts first (so Ctrl+Z doesn't reach the printable-char path).
-            // Always consume the key — success of Copy/Paste/Undo is independent of
-            // whether the keystroke belongs to this widget.
-            if (e.HasCtrl && !e.HasAlt)
+            // Cmd/Ctrl-shortcuts first (so Cmd+Z / Ctrl+Z doesn't reach the
+            // printable-char path). Cmd is the native modifier on macOS; Ctrl on
+            // Windows/Linux. We accept either so shortcuts feel right everywhere.
+            // Always consume the key — success of Copy/Paste/Undo is independent
+            // of whether the keystroke belongs to this widget.
+            if (e.HasCmdOrCtrl && !e.HasAlt)
             {
                 switch (e.Key)
                 {
@@ -402,8 +472,9 @@ namespace RatatuiUnity
                 }
             }
 
-            // Printable character
-            if (e.Character != '\0' && !char.IsControl(e.Character) && !e.HasCtrl)
+            // Printable character. Suppress when Cmd or Ctrl is held so macOS
+            // Cmd+C does not also insert a literal 'c'.
+            if (e.Character != '\0' && !char.IsControl(e.Character) && !e.HasCtrl && !e.HasCmd)
             {
                 InsertChar(e.Character);
                 return true;
@@ -554,6 +625,7 @@ namespace RatatuiUnity
             Color placeholderFg = default,
             bool focused = true)
         {
+            if (focused) SyncMobileKeyboard();
             _lastAreaId = areaId;
             if (!term.TryGetAreaRect(areaId, out int ax, out int ay, out int aw, out int ah) || aw <= 0)
             {
