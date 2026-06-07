@@ -14,31 +14,36 @@
 
 ## Boot Flow
 
+The console is a [Terminal App](terminal-apps.md) discovered via `[RatatuiTerminalApp(Id = "console")]`. Services and renderer bootstrap separately:
+
 ```mermaid
 sequenceDiagram
     participant U as Unity
+    participant TA as RatatuiTerminalApps
     participant RC as RatatuiConsole
     participant LC as ConsoleLogCapture
-    participant R as Renderer
+    participant R as RatatuiConsoleRenderer
 
+    U->>TA: BeforeSceneLoad
+    TA->>TA: Discover [RatatuiTerminalApp] types
+    TA->>U: GameObject + AddComponent RatatuiConsoleRenderer
     U->>RC: BeforeSceneLoad
-    RC->>RC: Bootstrap()
+    RC->>RC: EnsureServicesBooted()
     RC->>LC: Install() (subscribes to logMessageReceivedThreaded)
     RC->>RC: BuiltinCommands.Register()
-    RC->>U: new GameObject("[RatatuiConsole]") + DontDestroyOnLoad
-    RC->>R: AddComponent<RatatuiConsoleRenderer>
+    R->>RC: Awake → EnsureServicesBooted()
     Note over R: Idle until toggle key pressed
 ```
 
-The whole pipeline is `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]` — no GameObject to add manually.
+No GameObject to add manually — import the sample and press Play.
 
 ## Pieces
 
 | File | Role |
 |------|------|
-| `RatatuiConsole.cs` | Public facade: `Open/Close/Toggle`, `RegisterCommand`, `Log`, `ClearLogs`, accessors |
+| `RatatuiConsole.cs` | Public facade: `Open/Close/Toggle`, `TerminalApps`, `RegisterCommand`, `Log`, `ClearLogs`, accessors |
 | `RatatuiConsoleConfig.cs` | `ScriptableObject` for dimensions, font size, toggle key, buffer sizes, colors |
-| `RatatuiConsoleRenderer.cs` | The `RatatuiRenderer` that paints the log + prompt and handles input |
+| `RatatuiConsoleRenderer.cs` | `[RatatuiTerminalApp]` renderer that paints the log + prompt and handles input |
 | `ConsoleLogCapture.cs` | Hooks `Application.logMessageReceivedThreaded`, owns the log ring buffer |
 | `ConsoleCommandRegistry.cs` | Dictionary of registered commands, plus parser (`Parse(raw, out name, out args)`) |
 | `ConsoleHistory.cs` | Command-line history (up/down recall) |
@@ -104,6 +109,17 @@ Use `help` at runtime to print the live list.
 | `version` | Unity version, product name + `Application.version`, platform, editor/player flag. |
 | `sysinfo` | OS, device, CPU/GPU, memory totals, screen resolution + refresh rate, platform, internet reachability. |
 | `gc` | Force `GC.Collect()` and print managed-memory delta. |
+
+### Terminal apps
+
+For every app registered in `RatatuiTerminalApps`, `BuiltinCommands.Register()` adds a matching pair of commands at boot. The console sample registers as id `console`, so you get `open_console` and `close_console`. A custom app with id `debug` gets `open_debug` and `close_debug`.
+
+| Command | Description |
+|---------|-------------|
+| `open_<id>` | Open the terminal app with the given id (`RatatuiTerminalApps.Open`). |
+| `close_<id>` | Close the terminal app with the given id (`RatatuiTerminalApps.Close`). |
+
+Use `help` at runtime for the full list — it reflects every registered app. From code, `RatatuiConsole.TerminalApps` exposes the same registry as `RatatuiTerminalApps.Apps`.
 
 ### Emitting log entries (for testing capture)
 
@@ -245,7 +261,7 @@ For viewport-relative sizing (`Vmin`, etc.), see [Resolution & Readability](reso
 
 ## Caveat: Input System
 
-The renderer uses `UnityEngine.Input` (legacy). If your project has **Player Settings → Active Input Handling = "Input System Package (New)"**, the console will log a warning at boot and refuse to start. Set it to **"Both"** or **"Input Manager (Old)"** to use this sample as-is.
+Terminal apps (including the console) use `UnityEngine.Input` (legacy). If your project has **Player Settings → Active Input Handling = "Input System Package (New)"**, `RatatuiTerminalApps` logs a warning at boot and does not instantiate apps. Set it to **"Both"** or **"Input Manager (Old)"** to use this sample as-is. See [Terminal Apps](terminal-apps.md).
 
 ## Extending
 

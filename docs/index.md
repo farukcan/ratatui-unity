@@ -13,6 +13,7 @@ A Rust native plugin that renders [Ratatui](https://ratatui.rs) TUI widgets as R
 - [Layout](articles/layout.md) — `Split`, `Constraint`, `Block`, `Inner`, area IDs.
 - [Widget Examples](articles/widget-examples.md) — copy-pasteable snippets for every widget.
 - [Input Handling](articles/input-handling.md) — keyboard, mouse, hover, area hit-testing, `TerminalInput`.
+- [Terminal Apps](articles/terminal-apps.md) — scene-independent terminal apps: bootstrap, app list, open/close API.
 - [Samples Overview](articles/samples-overview.md) — what ships in `Samples~/` and how each piece is wired.
   - [BasicUsage tabs demo](articles/samples-basic-usage.md) · [Developer Console](articles/samples-console.md)
 - [C# API Reference](xref:RatatuiUnity) — public Unity-facing classes (`RatatuiTerminal`, `RatatuiRenderer`, builders).

@@ -25,14 +25,16 @@ graph LR
     A1 --> A10[About]
     A --> B[ESP32Terminal<br/>standalone device sim]
 
-    C[Console] --> C1[RatatuiConsole<br/>public facade]
+    C[Console] --> C0[RatatuiTerminalApps<br/>framework bootstrap]
+    C0 --> C5[RatatuiConsoleRenderer<br/>TerminalApp]
+    C --> C1[RatatuiConsole<br/>public facade]
     C1 --> C2[ConsoleLogCapture]
     C1 --> C3[ConsoleCommandRegistry]
     C1 --> C4[ConsoleHistory]
-    C1 --> C5[RatatuiConsoleRenderer]
 ```
 
 ## Next
 
 - [BasicUsage (Tabs Demo)](samples-basic-usage.md) — what each tab demonstrates and how to read its code.
 - [Developer Console](samples-console.md) — how to use, configure, and extend the runtime console.
+- [Terminal Apps](terminal-apps.md) — framework for scene-independent terminal apps (open/close, attribute discovery).

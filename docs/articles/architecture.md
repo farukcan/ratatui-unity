@@ -47,6 +47,11 @@ sequenceDiagram
 | `ChartBuilder`        | Fluent builder for Chart widget                      |
 | `Constraint`          | Layout constraints (`Length`, `Min`, `Percentage` …) |
 | `StyledText`, `ITab`  | Styling and tabular widget helpers                   |
+| `RatatuiTerminalApps` | Static bootstrap/registry for scene-independent terminal apps |
+| `RatatuiTerminalApp`  | Abstract base for apps with open/close/toggle lifecycle |
+| `RatatuiFocusManager` | Keyboard focus arbitration across multiple renderers |
+
+See [Terminal Apps](terminal-apps.md) for the app discovery and open/close API.
 
 ## Memory & Lifetime
 
