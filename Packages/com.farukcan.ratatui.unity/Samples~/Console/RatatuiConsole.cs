@@ -1,29 +1,33 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RatatuiUnity.Samples.Console
 {
     /// <summary>
     /// Public facade and bootstrap entry point for the Ratatui developer console.
-    /// All consumer-facing API surface lives here. The console GameObject is created
-    /// automatically before the first scene loads.
+    /// Console services (logs, commands, history) bootstrap here; the renderer is
+    /// created by <see cref="RatatuiTerminalApps"/> via <see cref="RatatuiTerminalAppAttribute"/>.
     /// </summary>
     public static class RatatuiConsole
     {
-        private static bool _booted;
+        private const string AppId = "console";
+
+        private static bool _servicesBooted;
         private static RatatuiConsoleConfig _config;
         private static ConsoleLogCapture _logs;
         private static ConsoleCommandRegistry _registry;
         private static ConsoleHistory _history;
-        private static RatatuiConsoleRenderer _renderer;
-        private static GameObject _go;
 
         public static RatatuiConsoleConfig Config => _config;
         public static ConsoleLogCapture Logs => _logs;
         public static ConsoleCommandRegistry Registry => _registry;
         public static ConsoleHistory History => _history;
 
-        public static bool IsOpen => _renderer != null && _renderer.IsOpen;
+        /// <summary>All registered terminal apps from <see cref="RatatuiTerminalApps"/>.</summary>
+        public static IReadOnlyList<TerminalAppHandle> TerminalApps => RatatuiTerminalApps.Apps;
+
+        public static bool IsOpen => RatatuiTerminalApps.IsOpen(AppId);
 
         // ── Bootstrap ────────────────────────────────────────────────────────
 
@@ -35,32 +39,38 @@ namespace RatatuiUnity.Samples.Console
         private static void ResetStatics()
         {
             if (_logs != null) _logs.Uninstall();
-            _booted = false;
+            _servicesBooted = false;
             _config = null;
             _logs = null;
             _registry = null;
             _history = null;
-            _renderer = null;
-            _go = null;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
         {
-            if (_booted) return;
+            EnsureServicesBooted();
+        }
 
-#if !ENABLE_LEGACY_INPUT_MANAGER
-            // Legacy Input Manager is disabled (project uses the new Input System only).
-            // The base RatatuiRenderer and HandleToggleKey both rely on UnityEngine.Input,
-            // which returns no events in this mode. Fail loudly instead of silently doing
-            // nothing for the rest of the session.
-            Debug.LogWarning(
-                "[RatatuiConsole] Legacy Input Manager is disabled. The developer console " +
-                "requires Player Settings → Active Input Handling = 'Both' or " +
-                "'Input Manager (Old)'. Console will not start.");
-            return;
-#else
-            _booted = true;
+        private static void OnApplicationQuitting()
+        {
+            // Symmetric uninstall: ensures we never leak handler subscriptions
+            // when the editor shuts the play session down.
+            if (_logs != null) _logs.Uninstall();
+            Application.quitting -= OnApplicationQuitting;
+        }
+
+        /// <summary>
+        /// Ensures console services (config, logs, registry, history) are initialized.
+        /// Called automatically at boot and from the renderer Awake when needed.
+        /// Services start regardless of the Legacy Input Manager setting — log capture
+        /// is useful even when the renderer cannot open. The renderer is blocked by
+        /// <see cref="RatatuiTerminalApps"/> when Legacy Input is disabled.
+        /// </summary>
+        internal static void EnsureServicesBooted()
+        {
+            if (_servicesBooted) return;
+            _servicesBooted = true;
 
             _config = Resources.Load<RatatuiConsoleConfig>("RatatuiConsoleConfig");
             if (_config == null)
@@ -73,41 +83,27 @@ namespace RatatuiUnity.Samples.Console
             _logs.Install();
             Application.quitting += OnApplicationQuitting;
             BuiltinCommands.Register();
-
-            _go = new GameObject("Ratatui Unity Developer Console");
-            _go.hideFlags = HideFlags.HideAndDontSave;
-            UnityEngine.Object.DontDestroyOnLoad(_go);
-            _renderer = _go.AddComponent<RatatuiConsoleRenderer>();
-#endif
-        }
-
-        private static void OnApplicationQuitting()
-        {
-            // Symmetric uninstall: ensures we never leak handler subscriptions
-            // when the editor shuts the play session down.
-            if (_logs != null) _logs.Uninstall();
-            Application.quitting -= OnApplicationQuitting;
         }
 
         // ── Command Registration ─────────────────────────────────────────────
 
         public static void RegisterCommand(string name, string description, Action<string[]> callback)
         {
-            EnsureBooted();
+            EnsureServicesBooted();
             if (_registry == null) return;
             _registry.Register(name, description, callback);
         }
 
         public static void UnregisterCommand(string name)
         {
-            EnsureBooted();
+            EnsureServicesBooted();
             if (_registry == null) return;
             _registry.Unregister(name);
         }
 
         public static void ExecuteCommand(string raw)
         {
-            EnsureBooted();
+            EnsureServicesBooted();
             if (_registry == null) return;
             if (!ConsoleCommandRegistry.Parse(raw, out string name, out string[] args))
                 return;
@@ -131,39 +127,22 @@ namespace RatatuiUnity.Samples.Console
 
         public static void Log(string message)
         {
-            EnsureBooted();
+            EnsureServicesBooted();
             _logs?.Append(ConsoleLogKind.Log, message, string.Empty);
         }
 
         public static void ClearLogs()
         {
-            EnsureBooted();
+            EnsureServicesBooted();
             _logs?.Clear();
         }
 
         // ── Visibility ───────────────────────────────────────────────────────
 
-        public static void Open()
-        {
-            if (_renderer != null) _renderer.SetOpen(true);
-        }
+        public static void Open() => RatatuiTerminalApps.Open(AppId);
 
-        public static void Close()
-        {
-            if (_renderer != null) _renderer.SetOpen(false);
-        }
+        public static void Close() => RatatuiTerminalApps.Close(AppId);
 
-        public static void Toggle()
-        {
-            if (_renderer != null) _renderer.SetOpen(!_renderer.IsOpen);
-        }
-
-        // ── Internal ─────────────────────────────────────────────────────────
-
-        private static void EnsureBooted()
-        {
-            if (_booted) return;
-            Bootstrap();
-        }
+        public static void Toggle() => RatatuiTerminalApps.Toggle(AppId);
     }
 }

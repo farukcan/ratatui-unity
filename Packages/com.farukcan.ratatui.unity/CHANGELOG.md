@@ -5,6 +5,10 @@ All notable changes to this package will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **`RatatuiTerminalApps` framework** — static bootstrap and registry for scene-independent terminal apps with open/close/toggle API, attribute-based discovery (`[RatatuiTerminalApp]`), and per-app `DontDestroyOnLoad` GameObjects.
+- **`RatatuiTerminalApp`** abstract base — shared toggle key, 4-finger touch toggle, open/close lifecycle hooks, and render guards.
+- **`TerminalAppHandle`** — registry descriptor (`Id`, `DisplayName`, `Order`, live `Instance`).
+- Developer Console sample refactored to use the Terminal Apps framework (`Id = "console"`).
 - **OnGUI display modes** on `RatatuiRenderer`: `Full` (stretch to entire screen), `Partial` (native texture size with horizontal/vertical alignment), and `Window` (draggable macOS-style chrome).
 - **Window mode title bar** shows the host GameObject name (same as the object name in the Hierarchy).
 - **`TerminalTextArea` scrollbars**: auto-hide vertical and horizontal scrollbars when content exceeds the viewport; the text area shrinks by one column/row internally so scrollbars do not overlap text.

@@ -7,28 +7,26 @@ namespace RatatuiUnity.Samples.Console
     /// <summary>
     /// MonoBehaviour that owns the console UI. Drives layout, log filtering,
     /// command prompt, autocomplete popup, and the per-log detail panel.
-    /// Created automatically by <see cref="RatatuiConsole.Bootstrap"/> — do not
+    /// Created automatically by <see cref="RatatuiTerminalApps"/> — do not
     /// add to scenes manually.
     /// </summary>
+    [RatatuiTerminalApp("console", DisplayName = "Developer Console", Order = 0)]
     [DefaultExecutionOrder(-100)]
-    public sealed class RatatuiConsoleRenderer : RatatuiRenderer
+    public sealed class RatatuiConsoleRenderer : RatatuiTerminalApp
     {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        private static void RegisterApp()
+        {
+            RatatuiTerminalApps.Register<RatatuiConsoleRenderer>("console", "Developer Console", 0);
+        }
+
         public enum Filter : byte { All = 0, Logs = 1, Warnings = 2, Errors = 3, Exceptions = 4 }
         private enum InputFocus : byte { Prompt = 0, Search = 1 }
 
         // ── Persistent UI state ──────────────────────────────────────────────
 
         private RatatuiConsoleConfig _config;
-        private bool _isOpen;
-        private int _freshOpenFrames; // skip mouse input until BuildFrame populates area_map
         private InputFocus _focus = InputFocus.Prompt;
-
-        // Hard-coded touch toggle: 4-finger tap. Tracks peak simultaneous touch
-        // count across an active session; fires on full release so the toggle
-        // happens AFTER the gesture ends — otherwise lingering touches in the
-        // next frame would immediately cancel the open we just performed.
-        private const int TouchToggleFingerCount = 4;
-        private int _touchSessionMaxCount;
 
         // Editable buffers built on TerminalInput — give us selection, clipboard,
         // undo/redo, Cmd/Ctrl shortcuts, horizontal scroll, and mobile IME for free.
@@ -83,7 +81,7 @@ namespace RatatuiUnity.Samples.Console
         private uint _autocompleteArea;
         private uint _promptArea;
 
-        public bool IsOpen => _isOpen;
+        protected override KeyCode ToggleKey => _config != null ? _config.toggleKey : KeyCode.BackQuote;
 
         // ── Style ────────────────────────────────────────────────────────────
 
@@ -104,6 +102,7 @@ namespace RatatuiUnity.Samples.Console
 
         protected override void Awake()
         {
+            RatatuiConsole.EnsureServicesBooted();
             _config = RatatuiConsole.Config;
             if (_config == null) _config = RatatuiConsoleConfig.CreateDefault();
             ApplyConfigToBase(_config);
@@ -135,7 +134,7 @@ namespace RatatuiUnity.Samples.Console
         private void OnPromptEscape()
         {
             if (_detailOpen) { _detailOpen = false; return; }
-            SetOpen(false);
+            SetOpen(false); // RatatuiTerminalApp
         }
 
         private void OnPromptHistoryStep(int dir)
@@ -155,81 +154,34 @@ namespace RatatuiUnity.Samples.Console
 
         protected override void Update()
         {
-            HandleToggleKey();
-
             // Always drain pending logs so the queue stays bounded even when the
             // console is closed for hours. The ring buffer applies its cap here.
             // Budget bounds the worst-case per-frame work so a log burst cannot
             // stall the renderer; the remainder drains over subsequent frames.
             RatatuiConsole.Logs?.DrainPending(ConsoleLogCapture.DefaultDrainBudget);
-
-            if (_freshOpenFrames > 0) _freshOpenFrames--;
-
-            if (!_isOpen) return; // skip render pipeline + input while closed
             base.Update();
         }
 
-        protected override void OnGUI()
+        protected override void OnOpened()
         {
-            if (!_isOpen) return;
-            base.OnGUI();
+            _focus = InputFocus.Prompt;
+            _prompt.OnFocus();
+            _followLogTail = true;
+            _forceLogScrollToBottom = true;
         }
 
-        // ── Open / Close ─────────────────────────────────────────────────────
-
-        public void SetOpen(bool open)
+        protected override void OnClosed()
         {
-            if (_isOpen == open) return;
-            _isOpen = open;
-            if (open)
-            {
-                // Keyboard is gated to the focused renderer; opening via toggle/API must
-                // take scene focus immediately so typing works without a click first.
-                RequestFocus();
-                _focus = InputFocus.Prompt;
-                _prompt.OnFocus();
-
-                // The area_map is stale or empty after a closed period; ignore mouse
-                // events for one frame so the next BuildFrame can populate it before
-                // ProcessMouse runs against it.
-                _freshOpenFrames = 1;
-                _followLogTail = true;
-                _forceLogScrollToBottom = true;
-            }
-            else
-            {
-                _prompt.OnBlur();
-                _search.OnBlur();
-                ClearSuggestions();
-            }
-        }
-
-        private void HandleToggleKey()
-        {
-            if (Input.GetKeyDown(_config.toggleKey))
-                SetOpen(!_isOpen);
-
-            HandleTouchToggle();
-        }
-
-        private void HandleTouchToggle()
-        {
-            int count = Input.touchCount;
-            if (count > _touchSessionMaxCount) _touchSessionMaxCount = count;
-
-            if (count == 0 && _touchSessionMaxCount > 0)
-            {
-                bool fire = _touchSessionMaxCount >= TouchToggleFingerCount;
-                _touchSessionMaxCount = 0;
-                if (fire) SetOpen(!_isOpen);
-            }
+            _prompt.OnBlur();
+            _search.OnBlur();
+            ClearSuggestions();
         }
 
         // ── Frame Building ───────────────────────────────────────────────────
 
         protected override void BuildFrame(RatatuiTerminal term)
         {
-            if (!_isOpen) return;
+            if (!IsOpen) return;
 
             RebuildFilterCacheIfNeeded();
             RebuildSuggestionsIfNeeded();
@@ -871,18 +823,8 @@ namespace RatatuiUnity.Samples.Console
 
         protected override void OnTerminalKeyDown(TerminalKeyEvent e)
         {
-            if (!_isOpen) return;
-
-            // Drop any event originating from the held toggle key. This covers:
-            //   (a) the special-key Down event for tracked toggle keys,
-            //   (b) the character that the toggle key emits via Input.inputString,
-            //   (c) OS auto-repeat characters while the key is still held.
-            if (Input.GetKey(_config.toggleKey))
-            {
-                if (e.Key == _config.toggleKey) return;
-                if (e.Character != '\0' && IsToggleKeyCharacter(_config.toggleKey, e.Character))
-                    return;
-            }
+            if (!IsOpen) return;
+            if (ShouldSuppressToggleKeyEvent(e)) return;
 
             if (e.Key == KeyCode.Tab && e.HasCtrl)
             {
@@ -910,21 +852,10 @@ namespace RatatuiUnity.Samples.Console
             else                              _prompt.HandleKeyEvent(e);
         }
 
-        private static bool IsToggleKeyCharacter(KeyCode key, char c)
-        {
-            switch (key)
-            {
-                case KeyCode.BackQuote: return c == '`' || c == '~';
-                case KeyCode.Tilde: return c == '~';
-                default: return false;
-            }
-        }
-
         protected override void OnTerminalMouseEvent(TerminalMouseEvent e)
         {
-            if (!_isOpen) return;
-            // The frame after Open(), area_map is stale; drop mouse events for one frame.
-            if (_freshOpenFrames > 0) return;
+            if (!IsOpen) return;
+            if (ShouldIgnoreMouseThisFrame()) return;
 
             if (e.Type == MouseEventType.Scroll)
             {

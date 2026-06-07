@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using RatatuiUnity;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -48,6 +49,37 @@ namespace RatatuiUnity.Samples.Console
             RatatuiConsole.RegisterCommand("enable", "SetActive(true): enable <path>.", EnableCmd);
             RatatuiConsole.RegisterCommand("disable", "SetActive(false): disable <path>.", DisableCmd);
             RatatuiConsole.RegisterCommand("toggle", "Flip activeSelf: toggle <path>.", ToggleCmd);
+
+            RegisterTerminalAppCommands();
+        }
+
+        private static void RegisterTerminalAppCommands()
+        {
+            var apps = RatatuiTerminalApps.Apps;
+            for (int i = 0; i < apps.Count; i++)
+            {
+                var app = apps[i];
+                string id = app.Id;
+                string label = app.DisplayName;
+
+                RatatuiConsole.RegisterCommand(
+                    "open_" + id,
+                    "Open the " + label + " terminal app.",
+                    _ =>
+                    {
+                        RatatuiTerminalApps.Open(id);
+                        Reply(label + " opened.");
+                    });
+
+                RatatuiConsole.RegisterCommand(
+                    "close_" + id,
+                    "Close the " + label + " terminal app.",
+                    _ =>
+                    {
+                        RatatuiTerminalApps.Close(id);
+                        Reply(label + " closed.");
+                    });
+            }
         }
 
         private static void HelpCmd(string[] args)
