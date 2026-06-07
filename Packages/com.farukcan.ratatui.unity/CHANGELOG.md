@@ -18,6 +18,7 @@ All notable changes to this package will be documented in this file.
 
 ### Fixed
 - **`RatatuiTerminalApps.Open` / `SetOpen(true)`** now calls `RequestFocus()` even when the app is already open, bringing keyboard input and OnGUI window z-order to the front.
+- **Notepad sample**: picking a note from the list after deleting the active note no longer overwrites a sibling note's filename/content. The editor-to-memory sync now follows `_editorNoteId` instead of the post-delete clamped `_selectedIndex`.
 - Pixel buffer is now flipped vertically before upload so Unity's `Texture2D.LoadRawTextureData` (bottom-to-top / OpenGL row order) displays the terminal the right way up.
 - **Colors tab**: Left column was empty because two `BeginStyledParagraph` builders were created simultaneously; the FFI layer holds only one pending paragraph at a time so the second call overwrote the first. Builders are now created and rendered sequentially.
 - **Dashboard tab**: Sparkline was invisible on startup because the backing array was initialized to all-zeros. The array is now pre-filled with random values in the constructor.

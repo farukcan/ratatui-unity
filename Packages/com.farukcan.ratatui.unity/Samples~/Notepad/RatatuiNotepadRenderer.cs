@@ -511,10 +511,15 @@ namespace RatatuiUnity.Samples.Notepad
             if (HasEditorContent() || _dirty)
                 EnsureCurrentEntry();
 
-            if (_selectedIndex < 0 || _selectedIndex >= _notes.Count)
-                return;
+            // Use _editorNoteId — not _selectedIndex — because after a delete
+            // the index can clamp onto a sibling note while the editor is empty.
+            // Writing through _selectedIndex would erase that sibling's data.
+            if (string.IsNullOrEmpty(_editorNoteId)) return;
 
-            var entry = _notes[_selectedIndex];
+            int idx = _notes.FindIndex(n => n.Id == _editorNoteId);
+            if (idx < 0) return;
+
+            var entry = _notes[idx];
             entry.Filename = _title.Value;
             entry.Content = _note.Value;
         }
@@ -561,7 +566,19 @@ namespace RatatuiUnity.Samples.Notepad
 
         private void EnsureCurrentEntry()
         {
-            if (_selectedIndex >= 0) return;
+            // The editor is "bound" to _editorNoteId, not _selectedIndex.
+            // After a delete _selectedIndex can point to a sibling while the
+            // editor itself has no backing note — in that case a fresh entry
+            // must be created instead of hijacking the sibling.
+            if (!string.IsNullOrEmpty(_editorNoteId))
+            {
+                int existing = _notes.FindIndex(n => n.Id == _editorNoteId);
+                if (existing >= 0)
+                {
+                    _selectedIndex = existing;
+                    return;
+                }
+            }
 
             var entry = new NotepadEntry
             {
@@ -570,7 +587,7 @@ namespace RatatuiUnity.Samples.Notepad
                 Content = string.Empty,
             };
             _notes.Add(entry);
-            _selectedIndex = _notes.IndexOf(entry);
+            _selectedIndex = _notes.Count - 1;
             _editorNoteId = entry.Id;
         }
 
