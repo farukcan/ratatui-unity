@@ -85,7 +85,9 @@ Best file to read for: **custom polyline drawing on Canvas, layered rendering wi
 
 ### Input (`InputTab.cs`)
 Two `TerminalInput` fields, Tab to switch focus, Enter to submit, click-to-position cursor, help-line, output panel.
-Best file to read for: **`TerminalInput` for text editing, field focus management, mouse-aware cursor positioning.**
+Best file to read for: **`TerminalInput` for single-line text editing, field focus management, mouse-aware cursor positioning.**
+
+For multiline editing (`TerminalTextArea`), see the [Notepad sample](samples-notepad.md).
 
 ## Standalone: `ESP32Terminal.cs`
 

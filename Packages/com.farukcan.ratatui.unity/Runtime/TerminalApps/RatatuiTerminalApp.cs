@@ -32,21 +32,24 @@ namespace RatatuiUnity
         /// <summary>Open or close the app window.</summary>
         public void SetOpen(bool open)
         {
-            if (_isOpen == open) return;
-            _isOpen = open;
-
-            if (open)
+            if (!open)
             {
-                RequestFocus();
-                _freshOpenFrames = 1;
-                OnOpened();
-            }
-            else
-            {
+                if (!_isOpen) return;
+                _isOpen = false;
                 OnClosed();
+                OnOpenChanged?.Invoke(false);
+                return;
             }
 
-            OnOpenChanged?.Invoke(open);
+            bool wasClosed = !_isOpen;
+            _isOpen = true;
+            RequestFocus();
+
+            if (!wasClosed) return;
+
+            _freshOpenFrames = 1;
+            OnOpened();
+            OnOpenChanged?.Invoke(true);
         }
 
         /// <summary>Toggle the app window open/closed.</summary>

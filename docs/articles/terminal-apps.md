@@ -110,7 +110,7 @@ Duplicate `id` values are skipped with a warning.
 
 `RatatuiTerminalApp` provides shared lifecycle:
 
-- **`IsOpen` / `SetOpen(bool)` / `Toggle()`** — visibility; opening calls `RequestFocus()` for keyboard input via `RatatuiFocusManager`.
+- **`IsOpen` / `SetOpen(bool)` / `Toggle()`** — visibility; `SetOpen(true)` always calls `RequestFocus()` — including when the app is already open — so `RatatuiTerminalApps.Open(id)` brings keyboard focus and window z-order to the front.
 - **`ToggleKey`** — override to bind a keyboard toggle (default `KeyCode.None`).
 - **`TouchToggleFingerCount`** — default 4; simultaneous touch count that toggles on full release.
 - **`Update()`** — always runs toggle handling; render pipeline runs only when open.

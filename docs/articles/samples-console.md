@@ -43,7 +43,7 @@ No GameObject to add manually — import the sample and press Play.
 |------|------|
 | `RatatuiConsole.cs` | Public facade: `Open/Close/Toggle`, `TerminalApps`, `RegisterCommand`, `Log`, `ClearLogs`, accessors |
 | `RatatuiConsoleConfig.cs` | `ScriptableObject` for dimensions, font size, toggle key, buffer sizes, colors |
-| `RatatuiConsoleRenderer.cs` | `[RatatuiTerminalApp]` renderer that paints the log + prompt and handles input |
+| `RatatuiConsoleRenderer.cs` | `[RatatuiTerminalApp]` renderer that paints the log + prompt; uses `TerminalCommandInput` for the command line (see [Input Handling](input-handling.md)) |
 | `ConsoleLogCapture.cs` | Hooks `Application.logMessageReceivedThreaded`, owns the log ring buffer |
 | `ConsoleCommandRegistry.cs` | Dictionary of registered commands, plus parser (`Parse(raw, out name, out args)`) |
 | `ConsoleHistory.cs` | Command-line history (up/down recall) |

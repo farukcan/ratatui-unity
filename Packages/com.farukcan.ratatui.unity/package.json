@@ -27,6 +27,11 @@
       "displayName": "Developer Console",
       "description": "Half-Life style runtime console with static command registration and Unity log capture. Auto-boots on play, toggle with backquote.",
       "path": "Samples~/Console"
+    },
+    {
+      "displayName": "Notepad",
+      "description": "Persistent multi-line notepad terminal app. Toggle with F12, notes saved under Application.persistentDataPath.",
+      "path": "Samples~/Notepad"
     }
   ]
 }

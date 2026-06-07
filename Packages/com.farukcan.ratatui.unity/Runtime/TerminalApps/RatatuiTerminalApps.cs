@@ -81,7 +81,10 @@ namespace RatatuiUnity
             _byId[id] = handle;
         }
 
-        /// <summary>Open the app with the given id.</summary>
+        /// <summary>
+        /// Open the app with the given id. If already open, brings it to
+        /// <see cref="RatatuiFocusManager"/> focus (keyboard input + window z-order).
+        /// </summary>
         public static void Open(string id)
         {
             EnsureBooted();
@@ -131,7 +134,10 @@ namespace RatatuiUnity
             return null;
         }
 
-        /// <summary>Open the first app whose instance is of type <typeparamref name="T"/>.</summary>
+        /// <summary>
+        /// Open the first app whose instance is of type <typeparamref name="T"/>.
+        /// If already open, brings it to focus.
+        /// </summary>
         public static void Open<T>() where T : RatatuiTerminalApp
         {
             var app = Get<T>();

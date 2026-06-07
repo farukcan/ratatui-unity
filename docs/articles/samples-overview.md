@@ -6,7 +6,7 @@ The UPM package ships three runnable samples under `Packages/com.farukcan.ratatu
 |--------|--------|---------------|
 | BasicUsage | `Samples~/BasicUsage/` | Full tabbed demo: 9 tabs covering every widget, layout, input, hover, animation. |
 | Developer Console | `Samples~/Console/` | Drop-in runtime console (logs + command registry) auto-bootstrapped before scene load. |
-| Notepad | `Samples~/Notepad/` | Persistent notepad terminal app (filename + multiline note, F12 toggle). |
+| Notepad | `Samples~/Notepad/` | Persistent notepad terminal app (`TerminalInput` title + `TerminalTextArea` body, F12 toggle). |
 
 Each sample is self-contained — it has its own `.asmdef`, only depends on `RatatuiUnity.Runtime`.
 

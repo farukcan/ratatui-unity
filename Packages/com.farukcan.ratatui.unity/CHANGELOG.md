@@ -9,6 +9,7 @@ All notable changes to this package will be documented in this file.
 - **`RatatuiTerminalApp`** abstract base — shared toggle key, 4-finger touch toggle, open/close lifecycle hooks, and render guards.
 - **`TerminalAppHandle`** — registry descriptor (`Id`, `DisplayName`, `Order`, live `Instance`).
 - Developer Console sample refactored to use the Terminal Apps framework (`Id = "console"`).
+- **Notepad sample** — terminal app (`Id = "notepad"`) with filename + multiline note editor, F12 toggle, and JSON persistence under `Application.persistentDataPath/ratatui-notepad/`.
 - **OnGUI display modes** on `RatatuiRenderer`: `Full` (stretch to entire screen), `Partial` (native texture size with horizontal/vertical alignment), and `Window` (draggable macOS-style chrome).
 - **Window mode title bar** shows the host GameObject name (same as the object name in the Hierarchy).
 - **`TerminalTextArea` scrollbars**: auto-hide vertical and horizontal scrollbars when content exceeds the viewport; the text area shrinks by one column/row internally so scrollbars do not overlap text.
@@ -16,6 +17,7 @@ All notable changes to this package will be documented in this file.
 - **`TerminalTextArea.OwnsArea`**: reports whether an area id belongs to the widget (outer area or scrollbar sub-areas) so callers can route clicks/scrolls correctly even when hit-testing resolves to a split sub-area.
 
 ### Fixed
+- **`RatatuiTerminalApps.Open` / `SetOpen(true)`** now calls `RequestFocus()` even when the app is already open, bringing keyboard input and OnGUI window z-order to the front.
 - Pixel buffer is now flipped vertically before upload so Unity's `Texture2D.LoadRawTextureData` (bottom-to-top / OpenGL row order) displays the terminal the right way up.
 - **Colors tab**: Left column was empty because two `BeginStyledParagraph` builders were created simultaneously; the FFI layer holds only one pending paragraph at a time so the second call overwrote the first. Builders are now created and rendered sequentially.
 - **Dashboard tab**: Sparkline was invisible on startup because the backing array was initialized to all-zeros. The array is now pre-filled with random values in the constructor.
