@@ -58,9 +58,12 @@ namespace RatatuiUnity.Samples.Notepad
         private static readonly Color ColorFocus = new Color(0.4f, 0.8f, 1.0f);
         private static readonly Color ColorText = new Color(0.85f, 0.85f, 0.9f);
         private static readonly Color ColorDim = new Color(0.5f, 0.5f, 0.55f);
-        private static readonly Color ColorButton = new Color(0.85f, 0.85f, 0.9f);
         private static readonly Color ColorButtonHi = new Color(0.4f, 0.8f, 1.0f);
         private static readonly Color ColorHoverBg = new Color(0.12f, 0.2f, 0.32f);
+        private static readonly Color ColorOpenBtn = new Color(1.0f, 0.85f, 0.35f);
+        private static readonly Color ColorSaveBtn = new Color(0.55f, 0.9f, 0.55f);
+        private static readonly Color ColorDeleteBtn = new Color(1.0f, 0.5f, 0.5f);
+        private static readonly Color ColorNewBtn = new Color(0.55f, 0.95f, 0.95f);
 
         private const string OpenBtnLabel = "[ F2 OPEN ]";
         private const string NewBtnLabel = "[ F5 NEW ]";
@@ -139,10 +142,10 @@ namespace RatatuiUnity.Samples.Notepad
 
                 if (cols.Length < 5) return;
 
-                _openBtnArea = DrawToolbarButton(term, cols[0], OpenBtnLabel);
-                _newBtnArea = DrawToolbarButton(term, cols[1], NewBtnLabel);
-                _saveBtnArea = DrawToolbarButton(term, cols[2], SaveBtnLabel);
-                _deleteBtnArea = DrawToolbarButton(term, cols[3], DeleteBtnLabel);
+                _openBtnArea = DrawToolbarButton(term, cols[0], OpenBtnLabel, ColorOpenBtn);
+                _newBtnArea = DrawToolbarButton(term, cols[1], NewBtnLabel, ColorNewBtn);
+                _saveBtnArea = DrawToolbarButton(term, cols[2], SaveBtnLabel, ColorSaveBtn);
+                _deleteBtnArea = DrawToolbarButton(term, cols[3], DeleteBtnLabel, ColorDeleteBtn);
 
                 term.SetStyle(ColorDim, Color.clear, Modifier.None);
                 term.Paragraph(cols[4], "pick a note or Esc to close list");
@@ -157,9 +160,9 @@ namespace RatatuiUnity.Samples.Notepad
 
             if (idleCols.Length < 4) return;
 
-            _openBtnArea = DrawToolbarButton(term, idleCols[0], OpenBtnLabel);
-            _newBtnArea = DrawToolbarButton(term, idleCols[1], NewBtnLabel);
-            _saveBtnArea = DrawToolbarButton(term, idleCols[2], SaveBtnLabel);
+            _openBtnArea = DrawToolbarButton(term, idleCols[0], OpenBtnLabel, ColorOpenBtn);
+            _newBtnArea = DrawToolbarButton(term, idleCols[1], NewBtnLabel, ColorNewBtn);
+            _saveBtnArea = DrawToolbarButton(term, idleCols[2], SaveBtnLabel, ColorSaveBtn);
             _deleteBtnArea = 0;
 
             string hint = _dirty ? "unsaved" : string.Empty;
@@ -713,13 +716,13 @@ namespace RatatuiUnity.Samples.Notepad
         // Render on the split column directly — same pattern as console filter tabs.
         // Nesting Block inside the 1-row toolbar inner area leaves zero content rows
         // and breaks both label layout and hit-testing.
-        private uint DrawToolbarButton(RatatuiTerminal term, uint area, string label)
+        private uint DrawToolbarButton(RatatuiTerminal term, uint area, string label, Color buttonColor)
         {
             bool hover = IsHovering(area);
-            var color = hover ? ColorButtonHi : ColorButton;
+            Color fg = hover ? ColorButtonHi : buttonColor;
             Color bg = hover ? ColorHoverBg : Color.clear;
             term.BeginStyledParagraph(area, Alignment.Center, false)
-                .Span(label, fg: color, bg: bg, modifiers: hover ? Modifier.Bold : Modifier.None)
+                .Span(label, fg: fg, bg: bg, modifiers: hover ? Modifier.Bold : Modifier.None)
                 .Render();
             return area;
         }

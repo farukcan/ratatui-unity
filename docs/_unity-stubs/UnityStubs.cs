@@ -491,6 +491,13 @@ namespace UnityEngine
         public RequireComponentAttribute(Type t0, Type t1) { }
     }
 
+    [AttributeUsage(AttributeTargets.Class, Inherited = true)]
+    public class DefaultExecutionOrderAttribute : Attribute
+    {
+        public int order { get; }
+        public DefaultExecutionOrderAttribute(int order) { }
+    }
+
     [AttributeUsage(AttributeTargets.Field)]
     public class HeaderAttribute : Attribute
     {
