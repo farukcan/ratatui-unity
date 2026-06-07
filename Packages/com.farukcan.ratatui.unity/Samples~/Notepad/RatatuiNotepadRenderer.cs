@@ -246,9 +246,9 @@ namespace RatatuiUnity.Samples.Notepad
                          : isHovered ? ColorHoverBg
                          : Color.clear;
 
-                string label = string.IsNullOrWhiteSpace(_notes[i].Filename)
+                string label = string.IsNullOrWhiteSpace(_notes[i].Title)
                     ? "Untitled"
-                    : _notes[i].Filename;
+                    : _notes[i].Title;
                 builder.SpanLine(Truncate(label, 24), fg, bg);
             }
 
@@ -483,7 +483,7 @@ namespace RatatuiUnity.Samples.Notepad
 
             _notes.Clear();
             _notes.AddRange(merged.Values);
-            _notes.Sort((a, b) => string.Compare(a.Filename, b.Filename, StringComparison.OrdinalIgnoreCase));
+            _notes.Sort((a, b) => string.Compare(a.Title, b.Title, StringComparison.OrdinalIgnoreCase));
 
             if (string.IsNullOrEmpty(_editorNoteId))
             {
@@ -504,7 +504,7 @@ namespace RatatuiUnity.Samples.Notepad
             _selectedIndex = index;
             var entry = _notes[index];
             _editorNoteId = entry.Id;
-            _title.Value = entry.Filename ?? string.Empty;
+            _title.Value = entry.Title ?? string.Empty;
             _note.Value = entry.Content ?? string.Empty;
             _dirty = EntryDiffersFromDisk(entry);
         }
@@ -523,7 +523,7 @@ namespace RatatuiUnity.Samples.Notepad
             if (idx < 0) return;
 
             var entry = _notes[idx];
-            entry.Filename = _title.Value;
+            entry.Title = _title.Value;
             entry.Content = _note.Value;
         }
 
@@ -542,7 +542,7 @@ namespace RatatuiUnity.Samples.Notepad
                 if (!string.Equals(disk.Id, entry.Id, StringComparison.Ordinal))
                     continue;
 
-                return !string.Equals(disk.Filename ?? string.Empty, entry.Filename ?? string.Empty, StringComparison.Ordinal)
+                return !string.Equals(disk.Title ?? string.Empty, entry.Title ?? string.Empty, StringComparison.Ordinal)
                     || !string.Equals(disk.Content ?? string.Empty, entry.Content ?? string.Empty, StringComparison.Ordinal);
             }
 
@@ -586,7 +586,7 @@ namespace RatatuiUnity.Samples.Notepad
             var entry = new NotepadEntry
             {
                 Id = NotepadStorage.CreateId(),
-                Filename = string.Empty,
+                Title = string.Empty,
                 Content = string.Empty,
             };
             _notes.Add(entry);
@@ -602,7 +602,7 @@ namespace RatatuiUnity.Samples.Notepad
             var entry = new NotepadEntry
             {
                 Id = NotepadStorage.CreateId(),
-                Filename = string.Empty,
+                Title = string.Empty,
                 Content = string.Empty,
             };
 
@@ -621,7 +621,7 @@ namespace RatatuiUnity.Samples.Notepad
             if (_selectedIndex < 0 || _selectedIndex >= _notes.Count) return;
 
             var entry = _notes[_selectedIndex];
-            entry.Filename = _title.Value.Trim();
+            entry.Title = _title.Value.Trim();
             entry.Content = _note.Value;
 
             NotepadStorage.Save(entry);

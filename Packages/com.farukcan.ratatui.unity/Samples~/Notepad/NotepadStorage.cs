@@ -11,14 +11,14 @@ namespace RatatuiUnity.Samples.Notepad
     public sealed class NotepadEntry
     {
         public string Id;
-        public string Filename;
+        public string Title;
         public string Content;
     }
 
     [Serializable]
     sealed class NotepadEntryDto
     {
-        public string filename;
+        public string title;
         public string content;
     }
 
@@ -52,7 +52,7 @@ namespace RatatuiUnity.Samples.Notepad
                     list.Add(new NotepadEntry
                     {
                         Id = Path.GetFileNameWithoutExtension(file),
-                        Filename = dto.filename ?? string.Empty,
+                        Title = dto.title ?? string.Empty,
                         Content = dto.content ?? string.Empty,
                     });
                 }
@@ -62,7 +62,7 @@ namespace RatatuiUnity.Samples.Notepad
                 }
             }
 
-            list.Sort((a, b) => string.Compare(a.Filename, b.Filename, StringComparison.OrdinalIgnoreCase));
+            list.Sort((a, b) => string.Compare(a.Title, b.Title, StringComparison.OrdinalIgnoreCase));
             return list;
         }
 
@@ -74,7 +74,7 @@ namespace RatatuiUnity.Samples.Notepad
             EnsureDirectory();
             var dto = new NotepadEntryDto
             {
-                filename = entry.Filename ?? string.Empty,
+                title = entry.Title ?? string.Empty,
                 content = entry.Content ?? string.Empty,
             };
 

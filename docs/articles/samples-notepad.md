@@ -1,6 +1,6 @@
 # Notepad Sample
 
-The Notepad sample is a scene-independent terminal app that lets you create, edit, and delete notes with a filename and multiline body. Notes persist as JSON files under `Application.persistentDataPath/ratatui-notepad/`.
+The Notepad sample is a scene-independent terminal app that lets you create, edit, and delete notes with a title and multiline body. Notes persist as JSON files under `Application.persistentDataPath/ratatui-notepad/`.
 
 Import via **Window → Package Manager → ratatui-unity → Samples → Notepad → Import**.
 
@@ -54,7 +54,7 @@ flowchart TD
 | Type | Role |
 |------|------|
 | `RatatuiNotepad` | Public facade: `Open` / `Close` / `Toggle`, config, storage path |
-| `RatatuiNotepadRenderer` | Terminal app UI: note list, filename field, `TerminalTextArea` |
+| `RatatuiNotepadRenderer` | Terminal app UI: note list, title field, `TerminalTextArea` |
 | `NotepadStorage` | Load/save/delete JSON files in persistent storage |
 | `RatatuiNotepadConfig` | Terminal dimensions, display mode, toggle key |
 
@@ -63,7 +63,7 @@ flowchart TD
 ```mermaid
 flowchart LR
   Renderer["RatatuiNotepadRenderer"]
-  Title["TerminalInput\nfilename, single-line"]
+  Title["TerminalInput\ntitle, single-line"]
   Body["TerminalTextArea\nnote body, multiline"]
   Focus["SetFocus()\nOnFocus / OnBlur"]
   Renderer --> Title
@@ -73,7 +73,7 @@ flowchart LR
   Focus --> Body
 ```
 
-- **Title** — `TerminalInput` with `SelectAllOnFocus = false` so Tab focus does not wipe the filename.
+- **Title** — `TerminalInput` with `SelectAllOnFocus = false` so Tab focus does not wipe the title.
 - **Note** — `TerminalTextArea` with vertical/horizontal scrollbars and `OwnsArea` routing for mouse wheel and scrollbar hit areas.
 - **Focus** — three targets (list, title, note). Tab cycles title ↔ note when the list is closed; opening the list moves focus to the picker.
 
@@ -83,13 +83,13 @@ Each note is stored as `{id}.json`:
 
 ```json
 {
-  "filename": "Shopping list",
+  "title": "Shopping list",
   "content": "Milk\nEggs\nBread"
 }
 ```
 
 - **Directory:** `Application.persistentDataPath/ratatui-notepad/`
-- **Id:** GUID filename (stable even when the display filename changes)
+- **Id:** GUID filename (stable even when the display title changes)
 - **Session state:** unsaved edits stay in memory across F12 toggle and Open-list close; click **SAVE** to persist to disk
 
 ## Configuration
