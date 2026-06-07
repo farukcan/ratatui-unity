@@ -393,7 +393,10 @@ namespace UnityEngine
         Keypad5 = 261, Keypad6 = 262, Keypad7 = 263, Keypad8 = 264, Keypad9 = 265,
         KeypadEnter = 271,
         LeftShift = 304, RightShift = 303, LeftControl = 306, RightControl = 305,
-        LeftAlt = 308, RightAlt = 307
+        LeftAlt = 308, RightAlt = 307,
+        LeftCommand = 310, RightCommand = 309,
+        LeftApple = 310, RightApple = 309,
+        LeftWindows = 311, RightWindows = 312
     }
 
     public static class Input
