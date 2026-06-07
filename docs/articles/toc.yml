@@ -20,5 +20,7 @@
       href: samples-basic-usage.md
     - name: Developer Console
       href: samples-console.md
+    - name: Notepad
+      href: samples-notepad.md
 - name: Rust Contributor Guide
   href: rust-contributor.md

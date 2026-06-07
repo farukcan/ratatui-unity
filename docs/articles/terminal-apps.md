@@ -2,7 +2,7 @@
 
 `RatatuiTerminalApps` is a Runtime framework for terminal apps that boot before the first scene, live in `DontDestroyOnLoad` GameObjects, and expose a static open/close API from anywhere in your project.
 
-Each app is a `RatatuiTerminalApp` subclass with its own `RatatuiRenderer` window. The developer console sample is the first built-in app using this system.
+Each app is a `RatatuiTerminalApp` subclass with its own `RatatuiRenderer` window. The Developer Console and Notepad samples are built-in apps using this system.
 
 ## Architecture
 
@@ -152,8 +152,25 @@ Apps in sample assemblies (e.g. Console with `autoReferenced: false`) are discov
 
 All discovered apps are created at boot. Closed apps still run `Update()` (for toggle keys and background work like log draining) but skip rendering.
 
+## Notepad Integration
+
+The [Notepad sample](samples-notepad.md) registers as:
+
+```csharp
+[RatatuiTerminalApp("notepad", DisplayName = "Notepad", Order = 10)]
+public sealed class RatatuiNotepadRenderer : RatatuiTerminalApp
+```
+
+`RatatuiNotepad` is the public facade. Notes persist under `Application.persistentDataPath/ratatui-notepad/`. Toggle with **F12** (configurable via `RatatuiNotepadConfig`).
+
+```csharp
+RatatuiNotepad.Open();   // → RatatuiTerminalApps.Open("notepad")
+RatatuiNotepad.Toggle(); // → RatatuiTerminalApps.Toggle("notepad")
+```
+
 ## See Also
 
 - [Developer Console sample](samples-console.md)
+- [Notepad sample](samples-notepad.md)
 - [Focus & Multi-Terminal](focus-and-multi-terminal.md)
 - [Architecture](architecture.md)
