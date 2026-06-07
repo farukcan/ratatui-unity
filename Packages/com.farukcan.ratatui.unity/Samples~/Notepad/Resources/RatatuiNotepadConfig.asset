@@ -20,6 +20,6 @@ MonoBehaviour:
   horizontalAlign: 1
   verticalAlign: 1
   windowStartMaximized: 0
-  backgroundColor: {r: 0, g: 0, b: 0, a: 1}
+  backgroundColor: {r: 0.0196, g: 0.0235, b: 0.0314, a: 1}
   toggleKey: 293
   windowChromeFont: {fileID: 12800000, guid: 7c3f9b1a4e6d2c8f5b9a7e3d1c2f4a6b, type: 3}
