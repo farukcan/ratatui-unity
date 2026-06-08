@@ -22,5 +22,7 @@
       href: samples-console.md
     - name: Notepad
       href: samples-notepad.md
+    - name: Profiler
+      href: samples-profiler.md
 - name: Rust Contributor Guide
   href: rust-contributor.md

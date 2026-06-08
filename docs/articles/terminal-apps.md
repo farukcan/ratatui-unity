@@ -2,7 +2,7 @@
 
 `RatatuiTerminalApps` is a Runtime framework for terminal apps that boot before the first scene, live in `DontDestroyOnLoad` GameObjects, and expose a static open/close API from anywhere in your project.
 
-Each app is a `RatatuiTerminalApp` subclass with its own `RatatuiRenderer` window. The Developer Console and Notepad samples are built-in apps using this system.
+Each app is a `RatatuiTerminalApp` subclass with its own `RatatuiRenderer` window. The Developer Console, Notepad, and Profiler samples are built-in apps using this system.
 
 ## Architecture
 
@@ -172,5 +172,6 @@ RatatuiNotepad.Toggle(); // → RatatuiTerminalApps.Toggle("notepad")
 
 - [Developer Console sample](samples-console.md)
 - [Notepad sample](samples-notepad.md)
+- [Profiler sample](samples-profiler.md)
 - [Focus & Multi-Terminal](focus-and-multi-terminal.md)
 - [Architecture](architecture.md)

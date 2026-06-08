@@ -115,4 +115,5 @@ To customize: duplicate or edit the asset under `Samples~/Notepad/Resources/`, o
 - [Input Handling](input-handling.md) — `TerminalInput`, `TerminalTextArea`, focus management, mobile keyboard
 - [Terminal Apps](terminal-apps.md)
 - [Developer Console](samples-console.md)
+- [Profiler](samples-profiler.md)
 - [Samples Overview](samples-overview.md)

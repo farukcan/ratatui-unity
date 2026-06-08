@@ -1,12 +1,13 @@
 # Samples Overview
 
-The UPM package ships three runnable samples under `Packages/com.farukcan.ratatui.unity/Samples~/`. Import them via **Window → Package Manager → ratatui-unity → Samples → Import**.
+The UPM package ships four runnable samples under `Packages/com.farukcan.ratatui.unity/Samples~/`. Import them via **Window → Package Manager → ratatui-unity → Samples → Import**.
 
 | Sample | Folder | What it shows |
 |--------|--------|---------------|
 | BasicUsage | `Samples~/BasicUsage/` | Full tabbed demo: 9 tabs covering every widget, layout, input, hover, animation. |
 | Developer Console | `Samples~/Console/` | Drop-in runtime console (logs + command registry) auto-bootstrapped before scene load. |
 | Notepad | `Samples~/Notepad/` | Persistent notepad terminal app (`TerminalInput` title + `TerminalTextArea` body, F9 toggle). |
+| Profiler | `Samples~/Profiler/` | Read-only telemetry overlay (FPS, GC, rendering, memory) with sparklines; F10 toggle. |
 
 Each sample is self-contained — it has its own `.asmdef`, only depends on `RatatuiUnity.Runtime`.
 
@@ -37,6 +38,11 @@ graph LR
     D0 --> D1[RatatuiNotepadRenderer]
     D --> D2[RatatuiNotepad facade]
     D2 --> D3[NotepadStorage]
+
+    E[Profiler] --> E0[RatatuiTerminalApps]
+    E0 --> E1[RatatuiProfilerRenderer]
+    E --> E2[RatatuiProfiler facade]
+    E1 --> E3[ProfilerMetrics]
 ```
 
 ## Next
@@ -44,4 +50,5 @@ graph LR
 - [BasicUsage (Tabs Demo)](samples-basic-usage.md) — what each tab demonstrates and how to read its code.
 - [Developer Console](samples-console.md) — how to use, configure, and extend the runtime console.
 - [Notepad](samples-notepad.md) — persistent notes terminal app.
+- [Profiler](samples-profiler.md) — real-time FPS/GC/memory telemetry overlay.
 - [Terminal Apps](terminal-apps.md) — framework for scene-independent terminal apps (open/close, attribute discovery).
