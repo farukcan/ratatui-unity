@@ -32,6 +32,11 @@
       "displayName": "Notepad",
       "description": "Persistent multi-line notepad terminal app. Toggle with F12, notes saved under Application.persistentDataPath.",
       "path": "Samples~/Notepad"
+    },
+    {
+      "displayName": "Profiler",
+      "description": "Read-only real-time telemetry overlay (FPS, frame time, GC, rendering stats, memory). Toggle with F10.",
+      "path": "Samples~/Profiler"
     }
   ]
 }
