@@ -30,7 +30,7 @@
     },
     {
       "displayName": "Notepad",
-      "description": "Persistent multi-line notepad terminal app. Toggle with F12, notes saved under Application.persistentDataPath.",
+      "description": "Persistent multi-line notepad terminal app. Toggle with F9, notes saved under Application.persistentDataPath.",
       "path": "Samples~/Notepad"
     },
     {

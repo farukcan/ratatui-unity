@@ -70,7 +70,7 @@ namespace RatatuiUnity.Samples.Notepad
         private const string SaveBtnLabel = "[ F3 SAVE ]";
         private const string DeleteBtnLabel = "[ F4 DELETE ]";
 
-        protected override KeyCode ToggleKey => _config != null ? _config.toggleKey : KeyCode.F12;
+        protected override KeyCode ToggleKey => _config != null ? _config.toggleKey : KeyCode.F9;
 
         protected override void Awake()
         {

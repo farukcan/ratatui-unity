@@ -27,7 +27,7 @@ namespace RatatuiUnity.Samples.Notepad
         public Color backgroundColor = new Color(0.0196f, 0.0235f, 0.0314f, 1f);
 
         [Header("Input")]
-        public KeyCode toggleKey = KeyCode.F12;
+        public KeyCode toggleKey = KeyCode.F9;
 
         public Font windowChromeFont;
 

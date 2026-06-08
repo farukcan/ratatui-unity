@@ -161,7 +161,7 @@ The [Notepad sample](samples-notepad.md) registers as:
 public sealed class RatatuiNotepadRenderer : RatatuiTerminalApp
 ```
 
-`RatatuiNotepad` is the public facade. Notes persist under `Application.persistentDataPath/ratatui-notepad/`. Toggle with **F12** (configurable via `RatatuiNotepadConfig`).
+`RatatuiNotepad` is the public facade. Notes persist under `Application.persistentDataPath/ratatui-notepad/`. Toggle with **F9** (configurable via `RatatuiNotepadConfig`).
 
 ```csharp
 RatatuiNotepad.Open();   // → RatatuiTerminalApps.Open("notepad")

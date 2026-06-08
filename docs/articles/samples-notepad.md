@@ -10,13 +10,13 @@ The app boots automatically before the first scene — no scene setup required.
 
 | Action | Input |
 |--------|-------|
-| Toggle notepad | **F12** |
+| Toggle notepad | **F9** |
 | Open note list | **F2** or click **[ F2 OPEN ]** (list closes after you pick a note) |
 | New note | **F5** or click **[ F5 NEW ]** |
 | Save note | **F3** or click **[ F3 SAVE ]** |
 | Delete note | **F4** or click **[ F4 DELETE ]** while the list is open |
 | Close list | **Esc** (while list is open) |
-| Close notepad | **Esc** or **F12** (editor state is kept in memory until you click **SAVE**) |
+| Close notepad | **Esc** or **F9** (editor state is kept in memory until you click **SAVE**) |
 | Cycle focus (title ↔ note) | **Tab** / **Shift+Tab** |
 | Select all (title or note) | **Cmd/Ctrl+A** |
 | Copy / cut / paste | **Cmd/Ctrl+C** / **Cmd/Ctrl+X** / **Cmd/Ctrl+V** |
@@ -47,7 +47,7 @@ flowchart TD
   Storage["NotepadStorage\npersistentDataPath/ratatui-notepad/*.json"]
   Register --> Apps
   Bootstrap --> Storage
-  Apps --> Renderer["RatatuiNotepadRenderer\nF12 toggle, UI"]
+  Apps --> Renderer["RatatuiNotepadRenderer\nF9 toggle, UI"]
   Renderer --> Storage
 ```
 
@@ -90,7 +90,7 @@ Each note is stored as `{id}.json`:
 
 - **Directory:** `Application.persistentDataPath/ratatui-notepad/`
 - **Id:** GUID filename (stable even when the display title changes)
-- **Session state:** unsaved edits stay in memory across F12 toggle and Open-list close; click **SAVE** to persist to disk
+- **Session state:** unsaved edits stay in memory across F9 toggle and Open-list close; click **SAVE** to persist to disk
 
 ## Configuration
 
@@ -100,7 +100,7 @@ To customize: duplicate or edit the asset under `Samples~/Notepad/Resources/`, o
 
 | Field | Default | Purpose |
 |-------|---------|---------|
-| `toggleKey` | `F12` | Keyboard toggle |
+| `toggleKey` | `F9` | Keyboard toggle |
 | `cols` / `rows` | 100 × 28 | Terminal size |
 | `fontSize` | `14` | OnGUI font size |
 | `sizingMode` | `Pixel` | How cols/rows map to screen pixels |
