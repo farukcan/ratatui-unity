@@ -91,6 +91,14 @@ namespace RatatuiUnity
         [Tooltip("Initial window Y position in screen GUI space. -1 = center on screen.")]
         [SerializeField] private float _windowInitialY = -1f;
 
+        [Tooltip("Initial window width in pixels (Window mode). " +
+                 "-1 = derive from terminal texture (Pixel mode) or 70% screen (Fit mode).")]
+        [SerializeField] private float _windowInitialWidth = -1f;
+
+        [Tooltip("Initial window height in pixels, including title bar (Window mode). " +
+                 "-1 = derive from terminal texture (Pixel mode) or 70% screen (Fit mode).")]
+        [SerializeField] private float _windowInitialHeight = -1f;
+
         [Tooltip("Start maximized (fills screen) on first open in Window mode.")]
         [SerializeField] private bool _windowStartMaximized;
 
@@ -170,6 +178,19 @@ namespace RatatuiUnity
 
         /// <summary>Start maximized (fills screen) on first open in Window mode.</summary>
         public bool WindowStartMaximized { get => _windowStartMaximized; set => _windowStartMaximized = value; }
+
+        /// <summary>
+        /// Initial window width in pixels (Window mode). -1 = derive from terminal texture
+        /// (Pixel sizing) or 70% of screen (Fit / viewport sizing). Setting this also drives
+        /// the FitColsAndRows target area on first open so the terminal grid matches.
+        /// </summary>
+        public float WindowInitialWidth { get => _windowInitialWidth; set => _windowInitialWidth = value; }
+
+        /// <summary>
+        /// Initial window height in pixels including the title bar (Window mode). -1 = derive
+        /// from terminal texture (Pixel sizing) or 70% of screen (Fit / viewport sizing).
+        /// </summary>
+        public float WindowInitialHeight { get => _windowInitialHeight; set => _windowInitialHeight = value; }
 
         /// <summary>
         /// Font used for OnGUI window chrome (title bar + zoom / resize glyphs). Setter
@@ -303,7 +324,10 @@ namespace RatatuiUnity
         private const float WindowResizeMargin = 3f;
 
         private static float WindowVMin => Mathf.Min(Screen.width, Screen.height) * WindowVMinPercent;
-        private static float WindowTitleBarHeight => WindowVMin * WindowTitleBarFactor;
+        // Snap to whole pixels so the titlebar's bottom edge and the content
+        // rect's top edge land on the same raster line — otherwise a fractional
+        // height (e.g. 25.7) leaves a 1-pixel gap that shows the desktop behind.
+        private static float WindowTitleBarHeight => Mathf.Round(WindowVMin * WindowTitleBarFactor);
         private static float WindowButtonSize => WindowVMin;
         private static int WindowTitleFontSize => Mathf.Max(1, Mathf.RoundToInt(WindowVMin));
 
@@ -1054,8 +1078,8 @@ namespace RatatuiUnity
         {
             if (_windowInitialized || Texture == null) return;
 
-            float w = Texture.width;
-            float h = Texture.height + WindowTitleBarHeight;
+            float w = _windowInitialWidth > 0f ? _windowInitialWidth : Texture.width;
+            float h = _windowInitialHeight > 0f ? _windowInitialHeight : Texture.height + WindowTitleBarHeight;
             float x = _windowInitialX < 0f ? (Screen.width - w) * 0.5f : _windowInitialX;
             float y = _windowInitialY < 0f ? (Screen.height - h) * 0.5f : _windowInitialY;
             _windowRect = new Rect(x, y, w, h);
@@ -1687,8 +1711,15 @@ namespace RatatuiUnity
                     height = Mathf.Max(1f, _windowRect.height - WindowTitleBarHeight);
                     return;
                 }
-                // First call before EnsureWindowInitialized — use a sane initial size
-                // (~70% of screen) so the very first auto fontSize lands somewhere usable.
+                // First call before EnsureWindowInitialized — honor the configured
+                // initial size if set, otherwise fall back to ~70% of screen so the
+                // very first auto fontSize lands somewhere usable.
+                if (_windowInitialWidth > 0f && _windowInitialHeight > 0f)
+                {
+                    width = _windowInitialWidth;
+                    height = Mathf.Max(1f, _windowInitialHeight - WindowTitleBarHeight);
+                    return;
+                }
                 width = Screen.width * 0.7f;
                 height = Mathf.Max(1f, Screen.height * 0.7f - WindowTitleBarHeight);
                 return;
@@ -1716,9 +1747,14 @@ namespace RatatuiUnity
 
             if (!_windowInitialized)
             {
-                float x = _windowInitialX < 0f ? (Screen.width - w) * 0.5f : _windowInitialX;
-                float y = _windowInitialY < 0f ? (Screen.height - h) * 0.5f : _windowInitialY;
-                _windowRect = new Rect(x, y, w, h);
+                // Configured initial pixel size overrides texture-derived size so the
+                // chrome opens at the user's requested rect even when FitColsAndRows
+                // is on (the grid was already fit to this same rect via GetTargetPixelRect).
+                float initW = _windowInitialWidth > 0f ? _windowInitialWidth : w;
+                float initH = _windowInitialHeight > 0f ? _windowInitialHeight : h;
+                float x = _windowInitialX < 0f ? (Screen.width - initW) * 0.5f : _windowInitialX;
+                float y = _windowInitialY < 0f ? (Screen.height - initH) * 0.5f : _windowInitialY;
+                _windowRect = new Rect(x, y, initW, initH);
                 _windowInitialized = true;
                 if (_windowStartMaximized && !_isMaximized)
                     ToggleMaximized();
