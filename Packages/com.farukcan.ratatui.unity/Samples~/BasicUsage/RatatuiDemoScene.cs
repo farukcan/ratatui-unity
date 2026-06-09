@@ -6,6 +6,7 @@ using UnityEngine.Events;
 /// <summary>
 /// Lerps the attached camera's transform (position and rotation) to target GameObjects.
 /// Use the bottom-centered OnGUI toolbar (Previous, numbered targets, [F8] Next, terminal apps) to switch targets.
+/// Use the top-centered OnGUI toolbar (Zoom In / Zoom Out) to adjust camera field of view.
 /// F8 advances to the next camera target when one is available.
 /// Initial target is index 0. Fires OnExit/OnEnter events on target switch.
 /// </summary>
@@ -13,9 +14,12 @@ public class RatatuiDemoScene : MonoBehaviour
 {
     [SerializeField] private Transform[] _targets;
     [SerializeField] private float _lerpSpeed = 3f;
+    [SerializeField] private float _minFieldOfView = 5f;
+    [SerializeField] private float _maxFieldOfView = 179f;
     [SerializeField] private CameraTargetEvent[] _events;
 
     private const float ToolbarFontVmaxPercent = 1.4f;
+    private const float FieldOfViewZoomStep = 1.10f;
     private const float ButtonHeightFontRatio = 1.82f;
     private const float NavButtonWidthFontRatio = 4.68f;
     private const float NextButtonWidthFontRatio = 5.85f;
@@ -25,6 +29,8 @@ public class RatatuiDemoScene : MonoBehaviour
     private const string ConsoleButtonLabel = "[F1] Console";
     private const string NotepadButtonLabel = "[F9] Notepad";
     private const string ProfilerButtonLabel = "[F10] Profiler";
+    private const string ZoomInButtonLabel = "Zoom In";
+    private const string ZoomOutButtonLabel = "Zoom Out";
     private const string ConsoleAppId = "console";
     private const string NotepadAppId = "notepad";
     private const string ProfilerAppId = "profiler";
@@ -44,18 +50,34 @@ public class RatatuiDemoScene : MonoBehaviour
         TargetButtonLabel7, TargetButtonLabel8, TargetButtonLabel9,
     };
     private const float TargetButtonWidthFontRatio = 2.34f;
+    private const float ZoomButtonWidthFontRatio = 6.5f;
     private const float ToolbarSpacingFontRatio = 0.52f;
 
+    private Camera _camera;
+    private float _targetFieldOfView;
     private int _activeTargetId = -1;
+
+    private void Awake()
+    {
+        _camera = GetComponent<Camera>();
+    }
 
     private void Start()
     {
+        if (_camera != null)
+            _targetFieldOfView = _camera.fieldOfView;
         SetTarget(0);
     }
 
     private void Update()
     {
         HandleInput();
+
+        if (_camera != null)
+        {
+            _camera.fieldOfView = Mathf.Lerp(
+                _camera.fieldOfView, _targetFieldOfView, _lerpSpeed * Time.deltaTime);
+        }
 
         if (_activeTargetId < 0 || _activeTargetId >= _targets.Length) return;
 
@@ -84,6 +106,9 @@ public class RatatuiDemoScene : MonoBehaviour
         buttonStyle.fontSize = Mathf.Max(1, Mathf.RoundToInt(fontSize));
 
         bool guiWasEnabled = GUI.enabled;
+
+        DrawTopZoomToolbar(
+            guiWasEnabled, fontSize, bottomMargin, rowHeight, buttonHeight, spacing);
 
         GUILayout.BeginArea(new Rect(0f, Screen.height - rowHeight - bottomMargin, Screen.width, rowHeight));
         GUILayout.BeginHorizontal();
@@ -123,6 +148,48 @@ public class RatatuiDemoScene : MonoBehaviour
         GUILayout.EndArea();
 
         buttonStyle.fontSize = previousFontSize;
+    }
+
+    private void DrawTopZoomToolbar(
+        bool guiWasEnabled,
+        float fontSize,
+        float topMargin,
+        float rowHeight,
+        float buttonHeight,
+        float spacing)
+    {
+        if (_camera == null) return;
+
+        float zoomButtonWidth = fontSize * ZoomButtonWidthFontRatio;
+
+        GUILayout.BeginArea(new Rect(0f, topMargin, Screen.width, rowHeight));
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+
+        GUI.enabled = guiWasEnabled && CanZoomIn();
+        if (GUILayout.Button(ZoomInButtonLabel, GUILayout.Width(zoomButtonWidth), GUILayout.Height(buttonHeight)))
+            ApplyFieldOfViewZoom(1f / FieldOfViewZoomStep);
+
+        GUILayout.Space(spacing);
+
+        GUI.enabled = guiWasEnabled && CanZoomOut();
+        if (GUILayout.Button(ZoomOutButtonLabel, GUILayout.Width(zoomButtonWidth), GUILayout.Height(buttonHeight)))
+            ApplyFieldOfViewZoom(FieldOfViewZoomStep);
+
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
+        GUILayout.EndArea();
+    }
+
+    private bool CanZoomIn() => _targetFieldOfView > _minFieldOfView + 0.01f;
+
+    private bool CanZoomOut() => _targetFieldOfView < _maxFieldOfView - 0.01f;
+
+    private void ApplyFieldOfViewZoom(float factor)
+    {
+        float next = Mathf.Clamp(_targetFieldOfView * factor, _minFieldOfView, _maxFieldOfView);
+        if (Mathf.Approximately(next, _targetFieldOfView)) return;
+        _targetFieldOfView = next;
     }
 
     private static string GetTargetButtonLabel(int targetIndex)
