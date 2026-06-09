@@ -9,7 +9,7 @@ using UnityEngine.Events;
 /// F8 advances to the next camera target when one is available.
 /// Initial target is index 0. Fires OnExit/OnEnter events on target switch.
 /// </summary>
-public class CameraLerp : MonoBehaviour
+public class RatatuiDemoScene : MonoBehaviour
 {
     [SerializeField] private Transform[] _targets;
     [SerializeField] private float _lerpSpeed = 3f;

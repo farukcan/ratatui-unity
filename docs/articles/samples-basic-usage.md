@@ -104,7 +104,7 @@ Together with `RatatuiDemo` this proves you can have **multiple independent term
 
 - `RatatuiShared.cs` — `StatefulList<T>` (selectable list with `Next` / `Previous` / `SelectFirst`)
 - `ITab.cs` — the tab interface used by `RatatuiDemo`
-- `CameraLerp.cs` — Unity-only utility for the demo scene camera (bottom-centered OnGUI toolbar sized with Vmax: font = 1.4% of `max(Screen.width, Screen.height)`, buttons scale proportionally; **F8** / **[F8] Next** advances camera targets; toggles `[F1] Console` / `[F9] Notepad` / `[F10] Profiler` via `RatatuiTerminalApps.Toggle`; only **F8** is a keyboard shortcut)
+- `RatatuiDemoScene.cs` — Unity-only utility for the demo scene camera (bottom-centered OnGUI toolbar sized with Vmax: font = 1.4% of `max(Screen.width, Screen.height)`, buttons scale proportionally; **F8** / **[F8] Next** advances camera targets; toggles `[F1] Console` / `[F9] Notepad` / `[F10] Profiler` via `RatatuiTerminalApps.Toggle`; only **F8** is a keyboard shortcut)
 
 ## Reading Order
 
