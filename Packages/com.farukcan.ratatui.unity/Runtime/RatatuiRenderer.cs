@@ -217,6 +217,16 @@ namespace RatatuiUnity
         /// </summary>
         public event Action<int, int, float> OnTerminalResized;
 
+        /// <summary>
+        /// Fires when the user clicks the red close button in Window mode.
+        /// While no subscribers are attached the button is rendered dim and ignores clicks
+        /// (the default — closing an embedded window has no built-in meaning).
+        /// Subscribe to enable the button: e.g. <c>OnCloseClicked += () =&gt; SetOpen(false)</c>
+        /// on a <see cref="RatatuiTerminalApp"/> for toggle-style apps,
+        /// or destroy / disable the GameObject for a hard close.
+        /// </summary>
+        public event Action OnCloseClicked;
+
         // ── Internal State ────────────────────────────────────────────────────
 
         // OnGUI fallback rect (GUI coordinates: y=0 at top)
@@ -298,10 +308,12 @@ namespace RatatuiUnity
         private GUIStyle _windowTitleStyle;
         private GUIStyle _windowZoomGlyphStyle;
 
-        // macOS traffic-light colors (close is permanently disabled → dim variant only)
+        // macOS traffic-light colors. Close switches between the dim disabled variant
+        // (no OnCloseClicked subscribers) and the full red enabled variant.
         private static readonly Color WindowMinimizeColor = new Color(0.996f, 0.737f, 0.180f);
         private static readonly Color WindowFullscreenColor = new Color(0.157f, 0.784f, 0.251f);
         private static readonly Color WindowTitleTextColor = new Color(0.85f, 0.85f, 0.87f);
+        private static readonly Color WindowCloseEnabledColor = new Color(1.000f, 0.373f, 0.341f);
         private static readonly Color WindowCloseDisabledColor = new Color(0.5f, 0.186f, 0.170f);
 
         // Right-side zoom + resize controls (uniform blue; resize dimmed while maximized)
@@ -1235,8 +1247,9 @@ namespace RatatuiUnity
             Rect minimizeHit = minimizeRect;
             Rect fullscreenHit = fullscreenRect;
 
-            // Close: disabled, visually dim — no click handling
-            FillCircle(closeRect, WindowCloseDisabledColor);
+            // Close: active iff OnCloseClicked has subscribers. Otherwise dim & inert.
+            bool closeEnabled = OnCloseClicked != null;
+            FillCircle(closeRect, closeEnabled ? WindowCloseEnabledColor : WindowCloseDisabledColor);
 
             // Right-side controls (all squares, same size as the traffic-lights).
             // Laid out from the far-right corner inward:
@@ -1252,6 +1265,17 @@ namespace RatatuiUnity
             HandleWindowResize(resizeHandleRect);
             HandleWindowDrag(titleBarRect, closeHit, minimizeHit, fullscreenHit,
                              zoomPlusRect, zoomMinusRect, resizeHandleRect);
+
+            // Close click → fire callback when enabled. Drag handler already early-returns
+            // on closeHit so we never compete with window drag.
+            if (closeEnabled
+                && Event.current.type == EventType.MouseDown
+                && Event.current.button == 0
+                && closeHit.Contains(Event.current.mousePosition))
+            {
+                OnCloseClicked.Invoke();
+                Event.current.Use();
+            }
 
             // Minimize: yellow toggle
             FillCircle(minimizeRect, WindowMinimizeColor);

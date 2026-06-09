@@ -60,6 +60,7 @@ namespace RatatuiUnity.Samples.Profiler
             if (_config == null) _config = RatatuiProfilerConfig.CreateDefault();
             ApplyConfigToBase(_config);
             base.Awake();
+            OnCloseClicked += () => SetOpen(false);
         }
 
         protected override void BuildFrame(RatatuiTerminal term)

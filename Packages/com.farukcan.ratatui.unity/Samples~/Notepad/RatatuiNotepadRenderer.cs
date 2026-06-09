@@ -79,6 +79,7 @@ namespace RatatuiUnity.Samples.Notepad
             if (_config == null) _config = RatatuiNotepadConfig.CreateDefault();
             ApplyConfigToBase(_config);
             base.Awake();
+            OnCloseClicked += () => SetOpen(false);
         }
 
         protected override void OnOpened()

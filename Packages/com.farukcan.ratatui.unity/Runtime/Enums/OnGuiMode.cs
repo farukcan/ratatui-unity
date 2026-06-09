@@ -15,7 +15,9 @@ namespace RatatuiUnity
         Partial,
 
         /// <summary>
-        /// Draggable macOS-style window with title bar (close disabled, minimize, fullscreen).
+        /// Draggable macOS-style window with title bar (close, minimize, fullscreen).
+        /// Close is inert by default and requires a subscriber on
+        /// <see cref="RatatuiRenderer.OnCloseClicked"/> to activate.
         /// Native pixel size like <see cref="Partial"/>; position is interactive.
         /// </summary>
         Window,

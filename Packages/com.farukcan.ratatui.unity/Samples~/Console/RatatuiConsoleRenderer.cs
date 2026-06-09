@@ -108,6 +108,7 @@ namespace RatatuiUnity.Samples.Console
             ApplyConfigToBase(_config);
             base.Awake();
             InitInputWiring();
+            OnCloseClicked += () => SetOpen(false);
         }
 
         private void InitInputWiring()
