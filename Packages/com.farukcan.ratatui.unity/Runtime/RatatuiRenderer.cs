@@ -325,7 +325,7 @@ namespace RatatuiUnity
         // Title bar height, title font size and traffic-light button size are all
         // derived from max(Screen.width, Screen.height) * WindowVMaxPercent so the
         // chrome scales with the viewport (vmax units, CSS-style).
-        private const float WindowVMaxPercent = 0.0175f;
+        private const float WindowVMaxPercent = 0.015f;
         private const float WindowTitleBarFactor = 1.6f;   // titlebar = vmax * factor → padding around buttons
         private const float WindowButtonPadding = 8f;
         private const float WindowButtonSpacing = 8f;
@@ -596,7 +596,7 @@ namespace RatatuiUnity
             // The Windows Super key is deliberately NOT mapped to Cmd: Win+letter
             // combos are reserved by the OS and would conflict with Copy/Paste.
             if (Input.GetKey(KeyCode.LeftCommand) || Input.GetKey(KeyCode.RightCommand)
-             || Input.GetKey(KeyCode.LeftApple)   || Input.GetKey(KeyCode.RightApple))
+             || Input.GetKey(KeyCode.LeftApple) || Input.GetKey(KeyCode.RightApple))
                 mods |= KeyModifiers.Cmd;
             return mods;
         }
