@@ -323,10 +323,10 @@ namespace RatatuiUnity
 
         // Window chrome layout constants
         // Title bar height, title font size and traffic-light button size are all
-        // derived from min(Screen.width, Screen.height) * WindowVMinPercent so the
-        // chrome scales with the viewport (vmin units, CSS-style).
-        private const float WindowVMinPercent = 0.0175f;
-        private const float WindowTitleBarFactor = 1.6f;   // titlebar = vmin * factor → padding around buttons
+        // derived from max(Screen.width, Screen.height) * WindowVMaxPercent so the
+        // chrome scales with the viewport (vmax units, CSS-style).
+        private const float WindowVMaxPercent = 0.0175f;
+        private const float WindowTitleBarFactor = 1.6f;   // titlebar = vmax * factor → padding around buttons
         private const float WindowButtonPadding = 8f;
         private const float WindowButtonSpacing = 8f;
         private const float WindowMinVisible = 80f;
@@ -335,13 +335,13 @@ namespace RatatuiUnity
         private const float WindowFontSizeMax = 200f;
         private const float WindowResizeMargin = 3f;
 
-        private static float WindowVMin => Mathf.Min(Screen.width, Screen.height) * WindowVMinPercent;
+        private static float WindowVMax => Mathf.Max(Screen.width, Screen.height) * WindowVMaxPercent;
         // Snap to whole pixels so the titlebar's bottom edge and the content
         // rect's top edge land on the same raster line — otherwise a fractional
         // height (e.g. 25.7) leaves a 1-pixel gap that shows the desktop behind.
-        private static float WindowTitleBarHeight => Mathf.Round(WindowVMin * WindowTitleBarFactor);
-        private static float WindowButtonSize => WindowVMin;
-        private static int WindowTitleFontSize => Mathf.Max(1, Mathf.RoundToInt(WindowVMin));
+        private static float WindowTitleBarHeight => Mathf.Round(WindowVMax * WindowTitleBarFactor);
+        private static float WindowButtonSize => WindowVMax;
+        private static int WindowTitleFontSize => Mathf.Max(1, Mathf.RoundToInt(WindowVMax));
 
         // Non-character keys polled with GetKeyDown each frame
         private static readonly KeyCode[] TrackedKeys =
