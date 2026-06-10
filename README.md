@@ -57,6 +57,8 @@ Open **Window → Package Manager → + → Add package from git URL** and paste
 https://github.com/farukcan/ratatui-unity.git#latest
 ```
 
+<img width="557" height="199" alt="Screenshot 2026-06-10 at 23 21 02" src="https://github.com/user-attachments/assets/0b8dc545-8e07-414e-8315-a0359b0e7036" />
+
 Or add to `Packages/manifest.json`:
 
 ```json
@@ -67,7 +69,7 @@ Or add to `Packages/manifest.json`:
 }
 ```
 
-See [`Packages/com.farukcan.ratatui.unity/README.md`](Packages/com.farukcan.ratatui.unity/README.md) for full documentation.
+See [`ratatui-unity.farukcan.dev`](https://ratatui-unity.farukcan.dev/) for full documentation.
 
 ## Building Native Binaries
 
