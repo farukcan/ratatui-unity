@@ -47,6 +47,59 @@ Or add to `Packages/manifest.json`:
 
 See [`ratatui-unity.farukcan.dev`](https://ratatui-unity.farukcan.dev/) for full documentation.
 
+## Sample Usage
+
+```csharp
+private void RenderHelpArea(RatatuiTerminal term, uint area)
+{
+    term.Block(area, "About Ratatui + Unity", Borders.All);
+    uint inner = term.Inner(area);
+
+    term.BeginStyledParagraph(inner, Alignment.Left, true)
+        .Span("ratatui-unity", fg: Color.cyan, modifiers: Modifier.Bold)
+        .Span(" — a Rust ")
+        .Span("ratatui", fg: Color.yellow, modifiers: Modifier.Italic)
+        .Span(" rendering backend for Unity via FFI.").Line().Line()
+        .Span("• All widget ", modifiers: Modifier.Bold).Span("data is owned in C#").Line()
+        .Span("• Rust acts as a ").Span("pure rendering engine", fg: Color.green).Line()
+        .Span("• Zero-copy pixel buffer via raw pointer").Line() .Line()
+        .Span("Keyboard", modifiers: Modifier.Bold | Modifier.Underlined).Line()
+        .Span("  A / D        ", fg: Color.cyan).Span("switch tabs").Line()
+        .Span("  W / S        ", fg: Color.cyan).Span("navigate lists").Line()
+        .Span("  Arrows       ", fg: Color.cyan).Span("same as W/S/A/D").Line().Line()
+        .Span("Mouse", modifiers: Modifier.Bold | Modifier.Underlined).Line()
+        .Span("  Click tab    ", fg: Color.cyan).Span("switch tabs").Line()
+        .Span("  Click item   ", fg: Color.cyan).Span("select list item").Line()
+        .Span("  Hover item   ", fg: Color.cyan).Span("highlight list item").Line()
+        .Span("  Scroll       ", fg: Color.cyan).Span("navigate lists / cycle tabs").Line()
+        .Render();
+}
+private void RenderForecastArea(RatatuiTerminal term, uint area)
+{
+    var cols = term.Split(area, Direction.Horizontal,
+        Constraint.Percentage(50),
+        Constraint.Percentage(50));
+
+    if (cols.Length < 2) return;
+
+    // High temps bar chart
+    term.Block(cols[0], "Highs °C", Borders.All);
+    uint highInner = term.Inner(cols[0]);
+    var highSb = new StringBuilder();
+    foreach (var f in Forecast) highSb.AppendLine($"{f.Day}\t{f.High}");
+    term.SetStyle(new Color(1f, 0.6f, 0f), Color.clear);
+    term.BarChart(highInner, highSb.ToString().TrimEnd(), barWidth: 3, barGap: 1);
+
+    // Low temps bar chart
+    term.Block(cols[1], "Lows °C", Borders.All);
+    uint lowInner = term.Inner(cols[1]);
+    var lowSb = new StringBuilder();
+    foreach (var f in Forecast) lowSb.AppendLine($"{f.Day}\t{f.Low}");
+    term.SetStyle(new Color(0.4f, 0.7f, 1f), Color.clear);
+    term.BarChart(lowInner, lowSb.ToString().TrimEnd(), barWidth: 3, barGap: 1);
+}
+```
+
 ## License
 
 MIT — see [`Packages/com.farukcan.ratatui.unity/LICENSE`](Packages/com.farukcan.ratatui.unity/LICENSE).  
