@@ -24,30 +24,6 @@ ratatui-unity is a Rust native plugin that brings [Ratatui](https://ratatui.rs)'
 
 Try WebGL **Demo** on your browser: [ratatui-unity-demo.farukcan.dev](https://ratatui-unity-demo.farukcan.dev/)
 
-## Repository Layout
-
-```
-ratatui-unity/
-  Cargo.toml                     ← Rust crate (cdylib + staticlib)
-  src/                           ← Rust source
-    lib.rs                       ← C API entry points
-    terminal.rs                  ← Terminal state & lifecycle
-    commands.rs                  ← Widget command queue & layout
-    renderer.rs                  ← Buffer → RGBA pixel pipeline
-    font.rs                      ← fontdue font manager
-    color.rs                     ← Ratatui Color → RGBA
-  fonts/
-    JetBrainsMono-Regular.ttf    ← Embedded default font (OFL)
-  build_all.sh                   ← Cross-compile script
-  .github/workflows/build.yml    ← CI/CD (matrix build + release)
-  Packages/
-    com.farukcan.ratatui.unity/  ← Unity Package Manager package
-      package.json
-      Runtime/                   ← C# scripts + .asmdef
-      Plugins/                   ← Native binaries (generated)
-      Samples~/BasicUsage/       ← Demo scene script
-      link.xml                   ← IL2CPP stripping protection
-```
 
 ## UPM Installation
 
