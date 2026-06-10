@@ -4,8 +4,12 @@ _layout: landing
 
 # ratatui-unity
 
-A Rust native plugin that renders [Ratatui](https://ratatui.rs) TUI widgets as RGBA pixel textures in Unity — for all platforms.
+ratatui-unity is a Rust native plugin that brings [Ratatui](https://ratatui.rs)'s TUI ecosystem to Unity 3D game engine — for all platforms. 
+
 <img width="958" height="598" alt="2026-06-10 at 22 51 59" src="https://github.com/user-attachments/assets/fe1dcbcc-ff08-43da-b380-72f3dc912968" />
+
+Try WebGL **Demo** on your browser: [ratatui-unity-demo.farukcan.dev](https://ratatui-unity-demo.farukcan.dev/)
+
 ## Quick Links
 
 - [Getting Started](articles/getting-started.md) — install the UPM package and render your first widget.
