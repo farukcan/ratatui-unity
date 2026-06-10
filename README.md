@@ -78,9 +78,8 @@ private void RenderForecastArea(RatatuiTerminal term, uint area)
 {
     var cols = term.Split(area, Direction.Horizontal,
         Constraint.Percentage(50),
-        Constraint.Percentage(50));
-
-    if (cols.Length < 2) return;
+        Constraint.Percentage(50)
+    );
 
     // High temps bar chart
     term.Block(cols[0], "Highs °C", Borders.All);
