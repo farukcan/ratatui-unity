@@ -18,7 +18,7 @@
 ![Platform Android](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
 ![Platform WebGL](https://img.shields.io/badge/platform-WebGL-990000?logo=webgl&logoColor=white)
 
-A Rust native plugin that renders [Ratatui](https://ratatui.rs) TUI widgets as RGBA pixel textures in Unity — for all platforms.
+ratatui-unity is a Rust native plugin that brings [Ratatui](https://ratatui.rs)'s TUI ecosystem to Unity 3D game engine — for all platforms. 
 
 <img width="958" height="598" alt="2026-06-10 at 22 51 59" src="https://github.com/user-attachments/assets/fe1dcbcc-ff08-43da-b380-72f3dc912968" />
 
