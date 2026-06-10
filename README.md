@@ -22,6 +22,7 @@ ratatui-unity is a Rust native plugin that brings [Ratatui](https://ratatui.rs)'
 
 <img width="958" height="598" alt="2026-06-10 at 22 51 59" src="https://github.com/user-attachments/assets/fe1dcbcc-ff08-43da-b380-72f3dc912968" />
 
+Try WebGL **Demo** on your browser: [ratatui-unity-demo.farukcan.dev](https://ratatui-unity-demo.farukcan.dev/)
 
 ## Repository Layout
 
