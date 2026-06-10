@@ -47,18 +47,6 @@ Or add to `Packages/manifest.json`:
 
 See [`ratatui-unity.farukcan.dev`](https://ratatui-unity.farukcan.dev/) for full documentation.
 
-## Building Native Binaries
-
-```bash
-# macOS only (no extra tools needed)
-./build_all.sh macos
-
-# All platforms
-./build_all.sh
-```
-
-See `build_all.sh` for platform-specific prerequisites (cross, Android NDK, Emscripten).
-
 ## License
 
 MIT — see [`Packages/com.farukcan.ratatui.unity/LICENSE`](Packages/com.farukcan.ratatui.unity/LICENSE).  
