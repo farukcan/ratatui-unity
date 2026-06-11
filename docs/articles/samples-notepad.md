@@ -2,6 +2,9 @@
 
 The Notepad sample is a scene-independent terminal app that lets you create, edit, and delete notes with a title and multiline body. Notes persist as JSON files under `Application.persistentDataPath/ratatui-notepad/`.
 
+<img width="347" height="423" alt="image" src="https://github.com/user-attachments/assets/fdf713aa-def5-4455-b0a2-70067984166f" />
+
+
 Import via **Window → Package Manager → ratatui-unity → Samples → Notepad → Import**.
 
 ## Quick Start
