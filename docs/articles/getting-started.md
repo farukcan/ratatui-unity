@@ -8,6 +8,9 @@ Open **Window → Package Manager → + → Add package from git URL** in Unity 
 https://github.com/farukcan/ratatui-unity.git#latest
 ```
 
+
+<img width="557" height="199" alt="Screenshot 2026-06-10 at 23 21 02" src="https://github.com/user-attachments/assets/0b8dc545-8e07-414e-8315-a0359b0e7036" />
+
 Or edit `Packages/manifest.json`:
 
 ```json
