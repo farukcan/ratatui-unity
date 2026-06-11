@@ -44,6 +44,7 @@ public class Demo : RatatuiRenderer
     }
 }
 ```
+<img width="349" height="145" alt="image" src="https://github.com/user-attachments/assets/72e1ecfd-193a-464d-b2d2-b210c76ac235" />
 
 Attach the component to a GameObject. If you assign a UI **RawImage** or a
 **MeshRenderer** to its inspector fields, the rendered texture is blitted there
