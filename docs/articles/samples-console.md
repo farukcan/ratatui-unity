@@ -2,6 +2,9 @@
 
 `Samples~/Console/` is a drop-in runtime developer console: import the sample, hit the toggle key, and you have a live log viewer + command line in any scene without writing any code.
 
+<img width="715" height="447" alt="image" src="https://github.com/user-attachments/assets/709cb9c8-402a-4843-8152-844d0b660869" />
+
+
 ## What You Get (Zero Setup)
 
 - Captures `Debug.Log` / `LogWarning` / `LogError` / exceptions automatically
