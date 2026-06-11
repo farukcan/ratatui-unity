@@ -2,6 +2,9 @@
 
 `Samples~/BasicUsage/` is the showcase application: a single `RatatuiDemo` host that swaps between 9 tabs, plus a standalone `ESP32Terminal` device simulator. Every widget in the library is touched somewhere.
 
+<img width="632" height="413" alt="image" src="https://github.com/user-attachments/assets/ca0198ce-93e4-466e-b128-4f7ac2dec5ac" />
+
+
 ## The Host: `RatatuiDemo`
 
 `RatatuiDemo` inherits `RatatuiRenderer` and owns an array of `ITab` instances. Each frame it:
@@ -55,33 +58,54 @@ Use this same pattern for any multi-screen app — it isolates each screen's sta
 Gauge + LineGauge progress, rolling random Sparkline, BarChart rotating event data, Chart with two animated sine waves, task list with hover/selection (`StatefulList<T>`), log list with scrolling.
 Best file to read for: **animated data, multiple widgets composed into one screen, mouse hit-testing for list rows.**
 
+<img width="861" height="389" alt="image" src="https://github.com/user-attachments/assets/60acbe51-cb13-4d0e-bbf3-45c4079d200b" />
+
 ### Servers (`ServersTab.cs`)
 Server `Table` on the left, world-map `Canvas` on the right (`Map(MapResolution.High)`), polyline between servers, colored points + labels.
 Best file to read for: **Canvas drawing, Map widget, geographic plotting.**
+
+<img width="860" height="511" alt="image" src="https://github.com/user-attachments/assets/a9284fb3-1739-45d6-bc75-5955eeb320b0" />
+
 
 ### Colors (`ColorsTab.cs`)
 All 16 named colors shown as styled spans — both as foreground and background. Two parallel `StyledParagraph` builders (one per column).
 Best file to read for: **multi-column `StyledParagraph` usage, the limitation that only one styled paragraph can be pending at a time.**
 
+<img width="861" height="511" alt="image" src="https://github.com/user-attachments/assets/13f6fc4f-93a3-4159-8a16-cff48ae0d4ba" />
+
+
 ### About (`AboutTab.cs`)
 Pure `StyledParagraph` essay with bold, italic, underline modifiers and cyan key bindings. No state.
 Best file to read for: **rich-text formatting reference.**
+
+<img width="859" height="510" alt="image" src="https://github.com/user-attachments/assets/86d8cd65-14f9-49ee-ada2-c07f88af2b05" />
+
 
 ### Email (`EmailTab.cs`)
 Inbox `StyledParagraph` list with selection + hover highlighting + scrollbar; reading pane below showing the selected message body.
 Best file to read for: **scroll/selection bookkeeping, `Scrollbar` widget, `EnsureSelectedVisible` pattern.**
 
+<img width="859" height="510" alt="image" src="https://github.com/user-attachments/assets/097310c7-bb33-485e-8f48-0e12f8657a07" />
+
+
 ### Recipe (`RecipeTab.cs`)
 Ingredient list with scrollbar, step-by-step instructions in a styled paragraph using `Span(line, Color, Color)` for inline emphasis.
 Best file to read for: **inline emphasis spans, scrollbar + selection combined.**
+
+<img width="859" height="511" alt="image" src="https://github.com/user-attachments/assets/dab2e0b4-0a03-47db-a791-dbfbc8bf8597" />
 
 ### Weather (`WeatherTab.cs`)
 Two BarCharts (Highs / Lows) side by side, a live `Calendar` showing today, and animated `LineGauge` download progress bars.
 Best file to read for: **BarChart with tab-separated data, Calendar, multiple animated LineGauges.**
 
+<img width="602" height="390" alt="image" src="https://github.com/user-attachments/assets/e2655ac5-707a-4435-a831-1e5e0fc96094" />
+
 ### Traceroute (`TracerouteTab.cs`)
 Hop `Table` with per-hop `Sparkline` ping graphs, and a Türkiye Canvas map with hand-drawn coastline polylines, the route in yellow, source (Ankara, green) and destination (İstanbul, red).
 Best file to read for: **custom polyline drawing on Canvas, layered rendering with `canvas.Layer()`, sparkline-per-row layouts.**
+
+<img width="762" height="405" alt="image" src="https://github.com/user-attachments/assets/ce13524b-7059-43a5-889e-0d1702713489" />
+
 
 ### Input (`InputTab.cs`)
 Two `TerminalInput` fields, Tab to switch focus, Enter to submit, click-to-position cursor, help-line, output panel.
@@ -89,9 +113,13 @@ Best file to read for: **`TerminalInput` for single-line text editing, field foc
 
 For multiline editing (`TerminalTextArea`), see the [Notepad sample](samples-notepad.md).
 
+<img width="762" height="402" alt="image" src="https://github.com/user-attachments/assets/fc1996f6-193e-4dd6-acac-84f1feba2ca4" />
+
 ## Standalone: `ESP32Terminal.cs`
 
 A second `RatatuiRenderer` subclass simulating an ESP32 serial console. It's not a tab — attach this script to a separate GameObject as its own renderer. Demonstrates:
+
+<img width="814" height="516" alt="image" src="https://github.com/user-attachments/assets/76dc2c71-3ab6-48bd-8290-2026da7e5292" />
 
 - Rolling log buffer with scroll-back via mouse wheel / PageUp / PageDown
 - Animated CPU temperature sparkline
@@ -99,6 +127,7 @@ A second `RatatuiRenderer` subclass simulating an ESP32 serial console. It's not
 - `TerminalInput` for the command line
 
 Together with `RatatuiDemo` this proves you can have **multiple independent terminals** in the same scene.
+
 
 ## Shared Helpers
 
