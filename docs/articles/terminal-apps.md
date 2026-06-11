@@ -59,7 +59,7 @@ namespace MyGame
         {
             if (!IsOpen) return;
             term.Block(term.RootArea, " DEBUG ", Borders.All);
-            term.DrawText(term.Inner(term.RootArea), "Hello from a terminal app.");
+            term.Paragraph(term.Inner(term.RootArea), "Hello from a terminal app.");
         }
 
         protected override void OnOpened()
@@ -123,7 +123,7 @@ Duplicate `id` values are skipped with a warning.
 The [Developer Console sample](samples-console.md) registers as:
 
 ```csharp
-[RatatuiTerminalApp(Id = "console", DisplayName = "Developer Console", Order = 0)]
+[RatatuiTerminalApp("console", DisplayName = "Developer Console", Order = 0)]
 public sealed class RatatuiConsoleRenderer : RatatuiTerminalApp
 ```
 

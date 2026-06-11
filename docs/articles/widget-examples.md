@@ -85,10 +85,10 @@ term.Sparkline(area, history);
 `progress` in `[0, 1]`:
 
 ```csharp
-term.Gauge(area, progress: 0.42f, label: "Loading…");
+term.Gauge(area, ratio: 0.42f, label: "Loading…");
 
 term.SetStyle(new Color(0.4f, 0.9f, 0.4f), Color.clear);
-term.LineGauge(area, progress: 0.91f, label: "package.unityp  [1240 KB/s]");
+term.LineGauge(area, ratio: 0.91f, label: "package.unityp  [1240 KB/s]");
 ```
 
 ## Chart (line chart with axes)
@@ -106,7 +106,7 @@ for (int i = 0; i < 100; i++)
     sin1[i * 2]     = i;
     sin1[i * 2 + 1] = Math.Sin(i / 3.0) * 18.0;
 }
-chart.Dataset("sin(x/3)", sin1, color: Color.cyan, marker: Marker.Braille);
+chart.Dataset("sin(x/3)", Marker.Braille, Color.cyan, sin1);
 
 chart.Render();
 ```
@@ -117,7 +117,7 @@ Newline-separated tab titles, plus the active index:
 
 ```csharp
 term.SetStyle(new Color(0.2f, 0.8f, 1f), Color.clear, Modifier.Bold);
-term.Tabs(area, "Dashboard\nServers\nColors\nAbout", activeTab: 0);
+term.Tabs(area, "Dashboard\nServers\nColors\nAbout", selected: 0);
 ```
 
 ## Calendar
@@ -134,7 +134,7 @@ Attach a vertical scrollbar to a parent area (typically a bordered block):
 ```csharp
 term.Scrollbar(area,
     contentLength: items.Length,
-    scrollPosition: scrollOffset,
+    position: scrollOffset,
     viewportLength: Math.Max(1, visibleRows),
     orientation: ScrollbarOrientation.VerticalRight);
 ```
@@ -157,7 +157,7 @@ canvas.Points(new double[] { -74, 40.7 }, new Color(0.2f, 1f, 0.2f)); // green d
 canvas.Text(-72.5, 42.2, "NYC", Color.white);
 
 canvas.Rectangle(20, 30, 10, 5, Color.cyan);
-canvas.Circle(centerX: 0, centerY: 0, radius: 15, Color.magenta);
+canvas.Circle(x: 0, y: 0, radius: 15, Color.magenta);
 
 canvas.Render();
 ```

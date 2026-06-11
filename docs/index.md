@@ -26,7 +26,7 @@ Try WebGL **Demo** on your browser: [ratatui-unity-demo.farukcan.dev](https://ra
 
 ## What it does
 
-`ratatui-unity` lets you embed any Ratatui terminal UI inside a Unity scene as a `Texture2D`. Layout, widgets, styling, and input are driven by Ratatui in Rust; rasterization to RGBA pixels happens natively; Unity sees a texture it can blit anywhere.
+`ratatui-unity` lets you embed any Ratatui terminal UI inside a Unity scene as a `Texture2D`. Layout, widgets, styling, and input are driven by Ratatui in Rust; rasterization to RGB24 pixels happens natively; Unity sees a texture it can blit anywhere.
 
 ## Supported Platforms
 

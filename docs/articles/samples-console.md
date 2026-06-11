@@ -14,7 +14,7 @@
 
 ## Boot Flow
 
-The console is a [Terminal App](terminal-apps.md) discovered via `[RatatuiTerminalApp(Id = "console")]`. Services and renderer bootstrap separately:
+The console is a [Terminal App](terminal-apps.md) — `RatatuiConsoleRenderer` is decorated with `[RatatuiTerminalApp("console", DisplayName = "Developer Console", Order = 0)]` (the attribute is a marker; actual registration is explicit, see [Terminal Apps](terminal-apps.md)). Services and renderer bootstrap separately:
 
 ```mermaid
 sequenceDiagram
@@ -24,8 +24,9 @@ sequenceDiagram
     participant LC as ConsoleLogCapture
     participant R as RatatuiConsoleRenderer
 
+    U->>TA: AfterAssembliesLoaded
+    R->>TA: Register<RatatuiConsoleRenderer>("console", ...)
     U->>TA: BeforeSceneLoad
-    TA->>TA: Discover [RatatuiTerminalApp] types
     TA->>U: GameObject + AddComponent RatatuiConsoleRenderer
     U->>RC: BeforeSceneLoad
     RC->>RC: EnsureServicesBooted()

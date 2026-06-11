@@ -35,22 +35,23 @@ See the comments at the top of `build_all.sh` for prerequisites per target.
 
 ## Module Layout
 
-| File          | Owns                                                    |
-|---------------|---------------------------------------------------------|
-| `lib.rs`      | Public C ABI (`ratatui_*` exports), nothing else        |
-| `terminal.rs` | `Terminal` struct, frame lifecycle, command queue       |
-| `commands.rs` | Widget enum + per-widget render dispatch                |
-| `renderer.rs` | `hash_cells`, `rasterize_buffer`, dirty-rect logic      |
-| `font.rs`     | `FontManager` (fontdue glyph cache)                     |
-| `color.rs`    | `color_to_rgb`, `DEFAULT_FG`/`DEFAULT_BG` constants     |
+| File          | Owns                                                                  |
+|---------------|-----------------------------------------------------------------------|
+| `lib.rs`      | Public C ABI (`ratatui_*` exports), nothing else                      |
+| `terminal.rs` | `TerminalState`, `WidgetCommand` enum + shared data types, frame state |
+| `commands.rs` | Per-widget render dispatch (consumes the queued `WidgetCommand`s)     |
+| `renderer.rs` | `compute_buffer_hash`, `render_buffer_to_pixels` (cell → RGB24)       |
+| `font.rs`     | `FontManager` (fontdue glyph cache)                                   |
+| `color.rs`    | `color_to_rgb`, `DEFAULT_FG`/`DEFAULT_BG` constants                   |
 
 ## Adding a Widget
 
-1. Add the widget variant to the command enum in `commands.rs`.
-2. Add an `extern "C"` enqueue function in `lib.rs`.
-3. Add a `DllImport` in `RatatuiNative.cs` plus a high-level method on `RatatuiTerminal`.
-4. Document both sides (`///` and `/// <summary>`).
-5. `cargo doc --no-deps` and `docfx build` (see [docs README](#building-the-docs-site)) should both pick it up automatically.
+1. Add the widget variant to the `WidgetCommand` enum in `terminal.rs`.
+2. Add the matching render arm in `commands.rs` (`render_all_commands`).
+3. Add an `extern "C"` enqueue function in `lib.rs`.
+4. Add a `DllImport` in `RatatuiNative.cs` plus a high-level method on `RatatuiTerminal`.
+5. Document both sides (`///` and `/// <summary>`).
+6. `cargo doc --no-deps` and `docfx build` (see [docs README](#building-the-docs-site)) should both pick it up automatically.
 
 ## Building the Docs Site
 

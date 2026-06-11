@@ -20,30 +20,77 @@ Or edit `Packages/manifest.json`:
 
 ## Minimal Usage
 
+The easiest path is to subclass `RatatuiRenderer` — it owns the `Texture2D`, the
+frame loop, input dispatch, and the `OnGUI` fallback. Override `BuildFrame` to
+draw widgets:
+
 ```csharp
 using RatatuiUnity;
 using UnityEngine;
 
+public class Demo : RatatuiRenderer
+{
+    protected override void BuildFrame(RatatuiTerminal term)
+    {
+        uint[] rows = term.Split(term.RootArea, Direction.Vertical,
+            Constraint.Length(3),
+            Constraint.Min(0));
+
+        term.Block(rows[0], "Header", Borders.All);
+        term.Paragraph(rows[1], "Hello from Ratatui!", Alignment.Center, wrap: true);
+    }
+}
+```
+
+Attach the component to a GameObject. If you assign a UI **RawImage** or a
+**MeshRenderer** to its inspector fields, the rendered texture is blitted there
+each frame. Otherwise the renderer falls back to `OnGUI` (Full / Partial /
+Window — see [Resolution & Readability](resolution-and-readability.md)).
+
+### Driving `RatatuiTerminal` directly
+
+If you need the lower-level API (custom frame pacing, manual texture
+management), use `RatatuiTerminal` from any `MonoBehaviour`:
+
+```csharp
+using RatatuiUnity;
+using System;
+using UnityEngine;
+
 public class Demo : MonoBehaviour
 {
-    RatatuiTerminal terminal;
+    RatatuiTerminal _term;
+    Texture2D _tex;
 
     void Start()
     {
-        terminal = new RatatuiTerminal(width: 80, height: 24);
+        _term = new RatatuiTerminal(cols: 80, rows: 24, fontSize: 14f);
+        _tex = new Texture2D(_term.PixelWidth, _term.PixelHeight,
+            TextureFormat.RGB24, mipChain: false);
+        GetComponent<Renderer>().material.mainTexture = _tex;
     }
 
     void Update()
     {
-        terminal.BeginFrame();
-        terminal.DrawBlock(x: 0, y: 0, w: 80, h: 24, title: "Hello");
-        Texture2D tex = terminal.EndFrame();
-        GetComponent<Renderer>().material.mainTexture = tex;
+        _term.BeginFrame();
+        _term.Block(_term.RootArea, "Hello", Borders.All);
+        IntPtr ptr = _term.EndFrameRaw();
+        _tex.LoadRawTextureData(ptr, _term.PixelWidth * _term.PixelHeight * RatatuiTerminal.BytesPerPixel);
+        _tex.Apply(updateMipmaps: false);
     }
 
-    void OnDestroy() => terminal.Dispose();
+    void OnDestroy()
+    {
+        _term?.Dispose();
+        if (_tex != null) Destroy(_tex);
+    }
 }
 ```
+
+`RatatuiTerminal` owns native memory and **must** be `Dispose()`d.
+`EndFrameRaw()` returns a pointer into the native pixel buffer; the bytes are
+RGB24 (`PixelWidth * PixelHeight * 3`) and remain valid until the next
+`BeginFrame()` call.
 
 See the `Samples~/BasicUsage` sample inside the UPM package for a full scene.
 

@@ -48,7 +48,7 @@ All notable changes to this package will be documented in this file.
 ### Added
 - Initial release
 - Ratatui 0.30 native backend (TestBackend, no crossterm dependency)
-- RGBA32 pixel buffer rendering via fontdue (JetBrains Mono embedded)
+- RGB24 pixel buffer rendering via fontdue (JetBrains Mono embedded)
 - Callback-based C API: `ratatui_create`, `ratatui_begin_frame`, `ratatui_end_frame`, widget commands
 - Unity UPM package with Assembly Definition (`RatatuiUnity.Runtime`)
 - C# high-level API: `RatatuiTerminal`, `RatatuiRenderer` MonoBehaviour
