@@ -99,6 +99,10 @@ private void RenderForecastArea(RatatuiTerminal term, uint area)
 }
 ```
 
+## Contributing
+
+Contributions are welcome — bug reports, docs, samples, and pull requests. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, build instructions, PR workflow, and issue templates.
+
 ## License
 
 MIT — see [`Packages/com.farukcan.ratatui.unity/LICENSE`](Packages/com.farukcan.ratatui.unity/LICENSE).  
