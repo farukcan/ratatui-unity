@@ -2,6 +2,9 @@
 
 The UPM package ships four runnable samples under `Packages/com.farukcan.ratatui.unity/Samples~/`. Import them via **Window → Package Manager → ratatui-unity → Samples → Import**.
 
+<img width="494" height="535" alt="image" src="https://github.com/user-attachments/assets/d5d1831f-8bf7-4b69-b28d-c07a9036e57c" />
+
+
 | Sample | Folder | What it shows |
 |--------|--------|---------------|
 | BasicUsage | `Samples~/BasicUsage/` | Full tabbed demo: 9 tabs covering every widget, layout, input, hover, animation. |
