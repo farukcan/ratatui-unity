@@ -2,6 +2,9 @@
 
 `Samples~/Profiler/` is a read-only runtime telemetry overlay: FPS, frame time, GC allocation, rendering stats, and memory usage in a four-panel dashboard with sparklines. Import the sample, press Play, and toggle the overlay — no scene setup required.
 
+<img width="404" height="316" alt="image" src="https://github.com/user-attachments/assets/9041d0ee-8bc8-44ea-a9a4-53373ea80f82" />
+
+
 Import via **Window → Package Manager → ratatui-unity → Samples → Profiler → Import**.
 
 ## Quick Start
