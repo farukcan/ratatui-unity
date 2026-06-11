@@ -44,12 +44,22 @@ public class Demo : RatatuiRenderer
     }
 }
 ```
+---
+Result:
+
 <img width="349" height="145" alt="image" src="https://github.com/user-attachments/assets/72e1ecfd-193a-464d-b2d2-b210c76ac235" />
+
+---
 
 Attach the component to a GameObject. If you assign a UI **RawImage** or a
 **MeshRenderer** to its inspector fields, the rendered texture is blitted there
 each frame. Otherwise the renderer falls back to `OnGUI` (Full / Partial /
 Window — see [Resolution & Readability](resolution-and-readability.md)).
+
+---
+
+<img width="537" height="720" alt="image" src="https://github.com/user-attachments/assets/4cf36f92-fbcc-48bf-9fd7-515c61a77913" />
+
 
 ### Driving `RatatuiTerminal` directly
 
