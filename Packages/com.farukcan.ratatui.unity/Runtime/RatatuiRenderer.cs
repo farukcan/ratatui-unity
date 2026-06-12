@@ -480,6 +480,12 @@ namespace RatatuiUnity
             IntPtr ptr = Terminal.EndFrameRawIfDirty();
             if (ptr != IntPtr.Zero)
             {
+                // A mid-frame SetCustomFont resizes the native buffer before the
+                // scheduled refit recreates the texture; uploading mismatched
+                // sizes would throw, so skip this frame's upload.
+                if (Texture.width != Terminal.PixelWidth
+                    || Texture.height != Terminal.PixelHeight)
+                    return;
                 int byteCount = Terminal.PixelWidth * Terminal.PixelHeight * RatatuiTerminal.BytesPerPixel;
                 Texture.LoadRawTextureData(ptr, byteCount);
                 Texture.Apply(updateMipmaps: false);
@@ -1586,7 +1592,16 @@ namespace RatatuiUnity
             if (Terminal == null) return false;
             bool ok = Terminal.SetCustomFont(ttfBytes);
             if (ok)
+            {
                 _customFontBytes = ttfBytes;
+                // New font metrics resize the native pixel buffer; if the GPU
+                // texture no longer matches, schedule a refit (deferred to
+                // Update — also safe when called from an OnGUI event flow).
+                if (Texture != null
+                    && (Texture.width != Terminal.PixelWidth
+                        || Texture.height != Terminal.PixelHeight))
+                    _resizeDirty = true;
+            }
             return ok;
         }
 
@@ -1631,6 +1646,12 @@ namespace RatatuiUnity
             int targetRows = _rows;
             if (_fitColsAndRows)
                 CalculateColsAndRows(fontSize, out targetCols, out targetRows);
+
+            // Inspector values are unconstrained ints; the RatatuiTerminal ctor
+            // rejects out-of-range dimensions, and this method re-runs on every
+            // refit — clamp instead of throwing repeatedly from Update.
+            targetCols = Mathf.Clamp(targetCols, 1, ushort.MaxValue);
+            targetRows = Mathf.Clamp(targetRows, 1, ushort.MaxValue);
 
             // Tear down the old handle + GPU texture before creating the new ones.
             // Order matters: dispose first to release the native pixel buffer,

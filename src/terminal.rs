@@ -322,7 +322,9 @@ impl TerminalState {
             next_area_id: 1,
             commands: Vec::new(),
             pending_style: Style::default(),
-            pixel_buffer: vec![0u8; (pixel_width * pixel_height * 3) as usize],
+            // Multiply in usize: the u32 product can overflow for large
+            // cols × rows × font_size combinations.
+            pixel_buffer: vec![0u8; pixel_width as usize * pixel_height as usize * 3],
             pixel_width,
             pixel_height,
             pending_styled_para: None,
@@ -364,6 +366,22 @@ impl TerminalState {
     /// [`Style::default`].
     pub fn take_style(&mut self) -> Style {
         std::mem::replace(&mut self.pending_style, Style::default())
+    }
+
+    /// Recomputes [`Self::pixel_width`] / [`Self::pixel_height`] from the
+    /// current font metrics and resizes the pixel buffer to match. Must be
+    /// called whenever the font (and thus the cell dimensions) changes so
+    /// the reported dimensions stay consistent with the buffer contents.
+    ///
+    /// Resets the dirty-check hash so the next `ratatui_end_frame_hashed`
+    /// call rasterizes with the new metrics.
+    pub fn resync_pixel_dimensions(&mut self) {
+        let area = *self.terminal.backend().buffer().area();
+        self.pixel_width = area.width as u32 * self.font.cell_width;
+        self.pixel_height = area.height as u32 * self.font.cell_height;
+        self.pixel_buffer =
+            vec![0u8; self.pixel_width as usize * self.pixel_height as usize * 3];
+        self.last_buffer_hash = None;
     }
 
     /// Rasterizes the current ratatui [`Buffer`](ratatui::buffer::Buffer)

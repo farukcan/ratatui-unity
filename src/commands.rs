@@ -337,15 +337,29 @@ pub fn render_all_commands(state: &mut TerminalState) {
 ///
 /// `data` format: first line tab-separated headers, subsequent lines
 /// tab-separated rows. All columns receive the same percentage width.
+///
+/// Columns are capped at the area width: more columns than cells cannot be
+/// displayed, and an unbounded column count both overflows the u16 width
+/// math and makes the layout solver pathologically slow.
 fn render_table(frame: &mut ratatui::Frame, area: Rect, data: &str, style: Style) {
+    let max_cols = (area.width as usize).max(1);
     let mut lines = data.lines();
-    let headers: Vec<&str> = lines.next().unwrap_or("").split('\t').collect();
+    let headers: Vec<&str> = lines
+        .next()
+        .unwrap_or("")
+        .split('\t')
+        .take(max_cols)
+        .collect();
     let col_count = headers.len().max(1);
     let header_row = Row::new(headers.iter().map(|h| Cell::from(*h)));
     let rows: Vec<Row> = lines
-        .map(|line| Row::new(line.split('\t').map(Cell::from).collect::<Vec<_>>()))
+        .map(|line| {
+            Row::new(line.split('\t').take(max_cols).map(Cell::from).collect::<Vec<_>>())
+        })
         .collect();
-    let equal_width = 100u16 / col_count as u16;
+    // Divide in usize: casting col_count to u16 first can truncate to 0
+    // (e.g. 65536 columns) and panic with a division by zero.
+    let equal_width = (100 / col_count) as u16;
     let widths: Vec<Constraint> =
         (0..col_count).map(|_| Constraint::Percentage(equal_width)).collect();
     frame.render_widget(
@@ -360,6 +374,9 @@ fn render_table(frame: &mut ratatui::Frame, area: Rect, data: &str, style: Style
 /// If `col_constraints` is empty all columns get equal percentage widths.
 /// A non-negative `selected_row` enables a stateful render with a bold
 /// highlight on the selected row.
+///
+/// Columns (and explicit column constraints) are capped at the area width;
+/// see `render_table` for the rationale.
 fn render_table_ex(
     frame: &mut ratatui::Frame,
     area: Rect,
@@ -368,18 +385,28 @@ fn render_table_ex(
     selected_row: i32,
     style: Style,
 ) {
+    let max_cols = (area.width as usize).max(1);
     let mut lines = data.lines();
-    let headers: Vec<&str> = lines.next().unwrap_or("").split('\t').collect();
+    let headers: Vec<&str> = lines
+        .next()
+        .unwrap_or("")
+        .split('\t')
+        .take(max_cols)
+        .collect();
     let col_count = headers.len().max(1);
     let rows: Vec<Row> = lines
-        .map(|line| Row::new(line.split('\t').map(Cell::from).collect::<Vec<_>>()))
+        .map(|line| {
+            Row::new(line.split('\t').take(max_cols).map(Cell::from).collect::<Vec<_>>())
+        })
         .collect();
     let widths: Vec<Constraint> = if col_constraints.is_empty() {
-        let eq = 100u16 / col_count as u16;
+        // Divide in usize: see render_table for the truncation hazard.
+        let eq = (100 / col_count) as u16;
         (0..col_count).map(|_| Constraint::Percentage(eq)).collect()
     } else {
         col_constraints
             .iter()
+            .take(max_cols)
             .map(|&(t, v)| constraint_from_bytes(t, v))
             .collect()
     };

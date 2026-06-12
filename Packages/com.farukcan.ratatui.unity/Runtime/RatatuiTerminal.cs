@@ -11,13 +11,13 @@ namespace RatatuiUnity
     /// </summary>
     public sealed class RatatuiTerminal : IDisposable
     {
-        private IntPtr _handle;
+        private RatatuiHandle _handle;
         private bool _disposed;
 
         /// <summary>
         /// Internal access to the native handle for builder classes in this assembly.
         /// </summary>
-        internal IntPtr Handle => _handle;
+        internal RatatuiHandle Handle => _handle;
 
         // Scratch arrays reused across Split() calls to avoid per-frame allocations.
         private byte[]   _splitTypes  = new byte[8];
@@ -48,11 +48,26 @@ namespace RatatuiUnity
         /// <summary>Root area ID (always 0).</summary>
         public uint RootArea => RatatuiNative.ratatui_root_area(_handle);
 
-        /// <param name="cols">Terminal width in character columns.</param>
-        /// <param name="rows">Terminal height in character rows.</param>
-        /// <param name="fontSize">Font size in pixels.</param>
+        /// <param name="cols">Terminal width in character columns (1–65535).</param>
+        /// <param name="rows">Terminal height in character rows (1–65535).</param>
+        /// <param name="fontSize">Font size in pixels. Must be positive and finite.</param>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when a parameter is outside its valid range. The native API
+        /// takes 16-bit dimensions; silently truncating an out-of-range value
+        /// would create a terminal of an unexpected size.
+        /// </exception>
         public RatatuiTerminal(int cols, int rows, float fontSize = 16f)
         {
+            if (cols < 1 || cols > ushort.MaxValue)
+                throw new ArgumentOutOfRangeException(
+                    nameof(cols), cols, "cols must be in 1..65535.");
+            if (rows < 1 || rows > ushort.MaxValue)
+                throw new ArgumentOutOfRangeException(
+                    nameof(rows), rows, "rows must be in 1..65535.");
+            if (!(fontSize > 0f) || float.IsInfinity(fontSize))
+                throw new ArgumentOutOfRangeException(
+                    nameof(fontSize), fontSize, "fontSize must be positive and finite.");
+
             Cols  = cols;
             Rows  = rows;
             _handle    = RatatuiNative.ratatui_create((ushort)cols, (ushort)rows, fontSize);
@@ -64,14 +79,23 @@ namespace RatatuiUnity
 
         /// <summary>
         /// Replace the embedded JetBrains Mono font with a custom TTF font.
+        /// On success the native pixel buffer is resized to the new font's
+        /// cell metrics and <see cref="PixelWidth"/> / <see cref="PixelHeight"/>
+        /// are refreshed — any texture sized from them must be recreated.
         /// </summary>
         /// <returns>True if the font was loaded successfully.</returns>
         public bool SetCustomFont(byte[] ttfBytes)
         {
             ThrowIfDisposed();
             if (ttfBytes == null || ttfBytes.Length == 0) return false;
-            return RatatuiNative.ratatui_set_custom_font(
+            bool ok = RatatuiNative.ratatui_set_custom_font(
                 _handle, ttfBytes, (uint)ttfBytes.Length) != 0;
+            if (ok)
+            {
+                PixelWidth  = (int)RatatuiNative.ratatui_pixel_width(_handle);
+                PixelHeight = (int)RatatuiNative.ratatui_pixel_height(_handle);
+            }
+            return ok;
         }
 
         // ── Frame ─────────────────────────────────────────────────────────────
@@ -404,11 +428,18 @@ namespace RatatuiUnity
 
         /// <summary>
         /// Render a monthly calendar for the given date.
+        /// Month is clamped to 1–12 and day to 1–31 (a raw byte cast would
+        /// silently truncate out-of-range values to a different date).
+        /// Dates that are still invalid after clamping (e.g. April 31) fall
+        /// back to January 1 on the native side.
         /// </summary>
         public void Calendar(uint areaId, int year, int month, int day)
         {
             ThrowIfDisposed();
-            RatatuiNative.ratatui_calendar(_handle, areaId, year, (byte)month, (byte)day);
+            RatatuiNative.ratatui_calendar(
+                _handle, areaId, year,
+                (byte)Mathf.Clamp(month, 1, 12),
+                (byte)Mathf.Clamp(day, 1, 31));
         }
 
         /// <summary>
@@ -563,22 +594,15 @@ namespace RatatuiUnity
 
         // ── IDisposable ───────────────────────────────────────────────────────
 
-        ~RatatuiTerminal()
-        {
-            Dispose();
-        }
+        // No finalizer here: _handle is a SafeHandle, whose own (critical)
+        // finalizer releases the native terminal if Dispose is never called.
 
         public void Dispose()
         {
             if (!_disposed)
             {
-                if (_handle != IntPtr.Zero)
-                {
-                    RatatuiNative.ratatui_destroy(_handle);
-                    _handle = IntPtr.Zero;
-                }
+                _handle?.Dispose();
                 _disposed = true;
-                GC.SuppressFinalize(this);
             }
         }
 

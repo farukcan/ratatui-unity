@@ -160,10 +160,12 @@ pub extern "C" fn ratatui_destroy(handle: *mut c_void) {
 
 /// Replaces the embedded JetBrains Mono font with custom TTF bytes.
 ///
-/// The cell width/height are recomputed from the new font's metrics, and the
-/// glyph cache is dropped. The pixel buffer is not resized here; callers that
-/// rely on a specific pixel size should re-create the handle if the new font
-/// changes cell dimensions.
+/// The cell width/height are recomputed from the new font's metrics, the
+/// glyph cache is dropped, and the pixel buffer is resized to the new
+/// `cols × cell_size` dimensions. After a successful call the values
+/// reported by [`ratatui_pixel_width`] / [`ratatui_pixel_height`] change
+/// accordingly; callers must re-query them and resize any host-side
+/// texture before the next `ratatui_end_frame*` call.
 ///
 /// # Returns
 /// `1` on success, `0` if `handle` is null, `font_data` is null/empty, or the
@@ -177,7 +179,11 @@ pub extern "C" fn ratatui_set_custom_font(
     if handle.is_null() || font_data.is_null() || font_len == 0 { return 0; }
     let state = unsafe { state_mut(handle) };
     let bytes = unsafe { std::slice::from_raw_parts(font_data, font_len as usize) };
-    u8::from(state.font.set_custom_font(bytes))
+    let ok = state.font.set_custom_font(bytes);
+    if ok {
+        state.resync_pixel_dimensions();
+    }
+    u8::from(ok)
 }
 
 // ─── Frame ───────────────────────────────────────────────────────────────────
@@ -866,7 +872,8 @@ pub extern "C" fn ratatui_chart_dataset(
     if handle.is_null() || data.is_null() { return; }
     let state = unsafe { state_mut(handle) };
     if let Some(ref mut pending) = state.pending_chart {
-        let raw = unsafe { std::slice::from_raw_parts(data, (point_count * 2) as usize) };
+        // Multiply in usize: `point_count * 2` can overflow u32.
+        let raw = unsafe { std::slice::from_raw_parts(data, point_count as usize * 2) };
         let points: Vec<(f64, f64)> = raw.chunks(2).map(|c| (c[0], c[1])).collect();
         pending.datasets.push(DatasetInfo {
             name: unsafe { cstr_to_string(name) },
@@ -1041,7 +1048,8 @@ pub extern "C" fn ratatui_canvas_points(
     if handle.is_null() || coords.is_null() { return; }
     let state = unsafe { state_mut(handle) };
     if let Some(ref mut p) = state.pending_canvas {
-        let raw = unsafe { std::slice::from_raw_parts(coords, (count * 2) as usize) };
+        // Multiply in usize: `count * 2` can overflow u32.
+        let raw = unsafe { std::slice::from_raw_parts(coords, count as usize * 2) };
         let pts: Vec<(f64, f64)> = raw.chunks(2).map(|c| (c[0], c[1])).collect();
         p.shapes.push(CanvasShape::Points { coords: pts, r, g, b });
     }
@@ -1140,4 +1148,52 @@ pub extern "C" fn ratatui_get_area_rect(
 #[no_mangle]
 pub extern "C" fn ratatui_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    /// Regression: 65536 tab-separated columns used to truncate `col_count`
+    /// to 0 in the u16 cast and panic with a division by zero — and, before
+    /// the column cap, stalled the layout solver for hours.
+    #[test]
+    fn table_with_more_than_u16_max_columns_does_not_panic() {
+        let handle = ratatui_create(10, 5, 14.0);
+        ratatui_begin_frame(handle);
+        let data = CString::new(vec!["h"; 65536].join("\t")).unwrap();
+        ratatui_table(handle, 0, data.as_ptr());
+        ratatui_end_frame(handle);
+        ratatui_destroy(handle);
+    }
+
+    /// Regression: invalid font bytes must be rejected without panicking
+    /// (the crate is built with `panic = "abort"` in release).
+    #[test]
+    fn set_custom_font_with_invalid_bytes_returns_zero() {
+        let handle = ratatui_create(10, 5, 14.0);
+        let bytes = [0u8; 16];
+        assert_eq!(ratatui_set_custom_font(handle, bytes.as_ptr(), bytes.len() as u32), 0);
+        ratatui_destroy(handle);
+    }
+
+    /// Regression: after a successful font swap the reported pixel dimensions
+    /// must match the rasterized buffer size.
+    #[test]
+    fn set_custom_font_resyncs_pixel_dimensions() {
+        let handle = ratatui_create(10, 5, 14.0);
+        let bytes = include_bytes!("../fonts/JetBrainsMono-Regular.ttf");
+        assert_eq!(
+            ratatui_set_custom_font(handle, bytes.as_ptr(), bytes.len() as u32),
+            1
+        );
+        let w = ratatui_pixel_width(handle);
+        let h = ratatui_pixel_height(handle);
+        ratatui_begin_frame(handle);
+        ratatui_end_frame(handle);
+        let state = unsafe { &*(handle as *const TerminalState) };
+        assert_eq!(state.pixel_buffer.len(), w as usize * h as usize * 3);
+        ratatui_destroy(handle);
+    }
 }

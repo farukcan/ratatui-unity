@@ -68,7 +68,8 @@ pub fn render_buffer_to_pixels(
     let baseline = font.baseline;
     let total_w = cols * cw;
     let total_h = rows * ch;
-    let required = (total_w * total_h * 3) as usize;
+    // Multiply in usize: the u32 product can overflow for large buffers.
+    let required = total_w as usize * total_h as usize * 3;
     pixels.resize(required, 0);
 
     for row in 0..rows {

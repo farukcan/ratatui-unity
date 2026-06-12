@@ -56,7 +56,9 @@ See [Terminal Apps](terminal-apps.md) for the app discovery and open/close API.
 ## Memory & Lifetime
 
 - Each `RatatuiTerminal` owns a Rust-side `TerminalState` allocated by `ratatui_create` and freed by `ratatui_destroy`.
+- The native handle is wrapped in a `SafeHandle` (`RatatuiHandle`), so the runtime keeps it alive for the duration of every P/Invoke and releases it exactly once.
 - The pixel buffer lives in Rust; C# receives a borrowed pointer per frame and must copy via `Texture2D.LoadRawTextureData` *before* the next `BeginFrame()`.
-- `RatatuiTerminal.Dispose()` is mandatory — `using` block or explicit call. Letting the C# object get GC'd without Dispose leaks the Rust terminal.
+- Call `RatatuiTerminal.Dispose()` deterministically (`using` block or explicit call). An undisposed object is still reclaimed by the `SafeHandle` finalizer, but only whenever the GC gets around to it.
+- `SetCustomFont` resizes the native pixel buffer to the new font's cell metrics and refreshes `PixelWidth` / `PixelHeight`; any texture sized from them must be recreated.
 
 See the [Rust API](../rust/ratatui_unity/index.html) for the exact `extern "C"` surface, and the [C# API](xref:RatatuiUnity) for the wrappers Unity code touches.
