@@ -99,6 +99,21 @@ private void RenderForecastArea(RatatuiTerminal term, uint area)
 }
 ```
 
+## Import built-in samples
+
+The UPM package ships four runnable samples under `Packages/com.farukcan.ratatui.unity/Samples~/`. Import them via **Window → Package Manager → ratatui-unity → Samples → Import**.
+
+<img width="494" height="535" alt="image" src="https://github.com/user-attachments/assets/d5d1831f-8bf7-4b69-b28d-c07a9036e57c" />
+
+
+| Sample | Folder | What it shows |
+|--------|--------|---------------|
+| BasicUsage | `Samples~/BasicUsage/` | Full tabbed demo: 9 tabs covering every widget, layout, input, hover, animation. |
+| Developer Console | `Samples~/Console/` | Drop-in runtime console (logs + command registry) auto-bootstrapped before scene load. |
+| Notepad | `Samples~/Notepad/` | Persistent notepad terminal app (`TerminalInput` title + `TerminalTextArea` body, F9 toggle). |
+| Profiler | `Samples~/Profiler/` | Read-only telemetry overlay (FPS, GC, rendering, memory) with sparklines; F10 toggle. |
+
+
 ## Contributing
 
 Contributions are welcome — bug reports, docs, samples, and pull requests. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, build instructions, PR workflow, and issue templates.
