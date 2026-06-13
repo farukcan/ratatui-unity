@@ -1,5 +1,7 @@
 # ratatui-unity
 
+[![Crates.io](https://img.shields.io/crates/v/ratatui-unity?logo=rust)](https://crates.io/crates/ratatui-unity)
+[![docs.rs](https://img.shields.io/docsrs/ratatui-unity?logo=docsdotrs)](https://docs.rs/ratatui-unity)
 [![Build Native Plugin](https://github.com/farukcan/ratatui-unity/actions/workflows/build.yml/badge.svg)](https://github.com/farukcan/ratatui-unity/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](Packages/com.farukcan.ratatui.unity/LICENSE)
 [![Rust Edition 2021](https://img.shields.io/badge/Rust-2021_Edition-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
