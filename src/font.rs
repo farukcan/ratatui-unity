@@ -117,10 +117,9 @@ impl FontManager {
     /// The coverage bitmap is row-major with one alpha byte per pixel
     /// (`0` = transparent, `255` = fully opaque).
     pub fn get_glyph(&mut self, ch: char) -> &(Metrics, Vec<u8>) {
-        if !self.glyph_cache.contains_key(&ch) {
-            let (metrics, bitmap) = self.font.rasterize(ch, self.font_size);
-            self.glyph_cache.insert(ch, (metrics, bitmap));
-        }
-        self.glyph_cache.get(&ch).unwrap()
+        // Disjoint field borrows let the cache entry rasterize from the font
+        // without a second lookup or an unwrap.
+        let (font, size, cache) = (&self.font, self.font_size, &mut self.glyph_cache);
+        cache.entry(ch).or_insert_with(|| font.rasterize(ch, size))
     }
 }

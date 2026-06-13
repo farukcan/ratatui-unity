@@ -1,0 +1,36 @@
+name: Lint & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The toolchain is pinned by rust-toolchain.toml (1.86.0), so newly
+      # introduced lints in future releases cannot break this `-D warnings` gate.
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.cargo/config.toml', 'rust-toolchain.toml') }}
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --lib --tests -- -D warnings
+
+      - name: Test
+        run: cargo test --lib

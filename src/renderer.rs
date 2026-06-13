@@ -249,7 +249,8 @@ fn fill_cell_rows(
     }
 }
 
-/// Minimal box-drawing renderer: paints centre-line horizontal/vertical segments.
+/// Minimal box-drawing renderer: paints centre-line horizontal/vertical
+/// segments.
 fn draw_box_drawing(
     pixels: &mut [u8],
     ch: char,
@@ -291,7 +292,8 @@ fn draw_box_drawing(
     }
 }
 
-/// Returns (left, right, up, down) segment flags for common box-drawing characters.
+/// Returns (left, right, up, down) segment flags for common box-drawing
+/// characters.
 fn box_drawing_segments(ch: char) -> (bool, bool, bool, bool) {
     match ch {
         '─' | '━' | '╌' | '╍' => (true,  true,  false, false),
@@ -334,7 +336,8 @@ fn fill_background(
 /// Alpha-composites a fontdue coverage bitmap over the cell at
 /// `(cell_px, cell_py)` using `fg` as the source color.
 ///
-/// `bitmap` is a row-major coverage map of size `metrics.width × metrics.height`.
+/// `bitmap` is a row-major coverage map of size
+/// `metrics.width × metrics.height`.
 /// The glyph is positioned using `metrics.xmin` / `metrics.ymin` relative to
 /// the baseline; pixels falling outside the cell are clipped.
 fn draw_glyph(

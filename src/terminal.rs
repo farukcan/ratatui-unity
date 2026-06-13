@@ -13,7 +13,7 @@ use crate::font::FontManager;
 use ratatui::{backend::TestBackend, layout::Rect, style::Style, Terminal};
 use std::collections::HashMap;
 
-// ─── Shared data types (used by WidgetCommand variants and pending builders) ──
+// ─── Shared data types (used by WidgetCommand variants and pending builders) ─
 
 /// Description of a chart axis (title and `[min, max]` data bounds).
 pub struct AxisInfo {
@@ -70,7 +70,7 @@ pub enum CanvasShape {
     Points    { coords: Vec<(f64, f64)>, r: u8, g: u8, b: u8 },
 }
 
-// ─── Widget command queue ─────────────────────────────────────────────────────
+// ─── Widget command queue ────────────────────────────────────────────────────
 
 /// A single widget request queued during a frame.
 ///
@@ -213,7 +213,7 @@ pub enum WidgetCommand {
     },
 }
 
-// ─── Pending builder state ────────────────────────────────────────────────────
+// ─── Pending builder state ───────────────────────────────────────────────────
 
 /// Accumulated state for a styled paragraph being constructed over multiple
 /// FFI calls (see [`crate::ratatui_styled_para_begin`]).
@@ -246,7 +246,7 @@ pub struct PendingCanvas {
     pub shapes: Vec<CanvasShape>,
 }
 
-// ─── Terminal state ───────────────────────────────────────────────────────────
+// ─── Terminal state ──────────────────────────────────────────────────────────
 
 /// Everything an FFI handle owns: ratatui terminal, font, layout map,
 /// per-frame command queue, builder state, and the rasterized pixel buffer.
@@ -365,7 +365,7 @@ impl TerminalState {
     /// Returns the current [`Self::pending_style`] and resets it to
     /// [`Style::default`].
     pub fn take_style(&mut self) -> Style {
-        std::mem::replace(&mut self.pending_style, Style::default())
+        std::mem::take(&mut self.pending_style)
     }
 
     /// Recomputes [`Self::pixel_width`] / [`Self::pixel_height`] from the

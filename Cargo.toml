@@ -25,3 +25,18 @@ time = { version = "0.3", default-features = false }
 opt-level = "z"
 lto = true
 panic = "abort"
+
+[lints.clippy]
+# The C ABI surface dereferences raw pointers inside a few safe-signature
+# helper functions (state_mut, state_ref, cstr_to_string, slice_from). unsafe
+# is confined to and documented inside those helpers; this lint would otherwise
+# flag them. The public FFI entry points stay free of `unsafe`.
+not_unsafe_ptr_arg_deref = "allow"
+# Internal pixel-blit helpers legitimately take many positional args.
+too_many_arguments = "allow"
+# Guardrails against silent panics and undocumented unsafe.
+undocumented_unsafe_blocks = "warn"
+get_unwrap = "warn"
+unwrap_used = "warn"
+panic = "warn"
+mem_replace_with_default = "warn"
