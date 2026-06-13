@@ -1,7 +1,13 @@
 [package]
-name = "ratatui_unity"
+name = "ratatui-unity"
 version = "0.1.0"
 edition = "2021"
+description = "A Rust native plugin that brings Ratatui's TUI ecosystem to Unity 3D game engine — for all platforms."
+license = "MIT"
+repository = "https://github.com/farukcan/ratatui-unity"
+readme = "README.md"
+keywords = ["ratatui", "tui", "unity", "terminal", "gamedev"]
+categories = ["game-development", "external-ffi-bindings", "rendering"]
 
 [lib]
 name = "ratatui_unity"

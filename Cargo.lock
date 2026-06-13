@@ -288,6 +288,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ratatui-unity"
+version = "0.1.0"
+dependencies = [
+ "fontdue",
+ "ratatui",
+ "rustc-hash",
+ "time",
+]
+
+[[package]]
 name = "ratatui-widgets"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -304,16 +314,6 @@ dependencies = [
  "time",
  "unicode-segmentation",
  "unicode-width",
-]
-
-[[package]]
-name = "ratatui_unity"
-version = "0.1.0"
-dependencies = [
- "fontdue",
- "ratatui",
- "rustc-hash",
- "time",
 ]
 
 [[package]]
