@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-unity"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A Rust native plugin that brings Ratatui's TUI ecosystem to Unity 3D game engine — for all platforms."
 license = "MIT"
