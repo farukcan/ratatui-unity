@@ -25,6 +25,15 @@ namespace RatatuiUnity
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
+            // Destroy instances surviving from a previous play session before dropping the
+            // references. With "Reload Domain = Off" the statics persist across sessions, so
+            // without this the old GameObjects would be orphaned and never cleaned up.
+            for (int i = 0; i < _apps.Count; i++)
+            {
+                if (_apps[i].Instance != null)
+                    UnityEngine.Object.Destroy(_apps[i].Instance.gameObject);
+            }
+
             _booted = false;
             _apps.Clear();
             _byId.Clear();
@@ -177,7 +186,11 @@ namespace RatatuiUnity
             {
                 var handle = _apps[i];
                 var go = new GameObject(handle.DisplayName);
-                go.hideFlags = HideFlags.HideAndDontSave;
+                // HideInHierarchy only (not HideAndDontSave): the DontSave flag keeps the
+                // GameObject alive across play-mode exit in the editor (especially with
+                // "Enter Play Mode → Reload Domain/Scene = Off"), so instances would pile
+                // up every play session. Runtime objects are never serialized anyway.
+                go.hideFlags = HideFlags.HideInHierarchy;
                 UnityEngine.Object.DontDestroyOnLoad(go);
                 handle.Instance = handle.Factory(go);
             }
