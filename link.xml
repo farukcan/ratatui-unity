@@ -1,0 +1,8 @@
+<linker>
+  <!-- Prevent IL2CPP managed code stripping from removing the P/Invoke entry points -->
+  <assembly fullname="RatatuiUnity.Runtime">
+    <type fullname="RatatuiUnity.RatatuiNative"   preserve="all"/>
+    <type fullname="RatatuiUnity.RatatuiTerminal"  preserve="all"/>
+    <type fullname="RatatuiUnity.RatatuiRenderer"  preserve="all"/>
+  </assembly>
+</linker>

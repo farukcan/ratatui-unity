@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a05c6f7d514f74e42b7e0bc570c1a66e, type: 3}
+  m_Name: RatatuiConsoleConfig
+  m_EditorClassIdentifier: RatatuiUnity.Samples.Console::RatatuiUnity.Samples.Console.RatatuiConsoleConfig
+  cols: 120
+  rows: 32
+  fontSize: 1.6
+  sizingMode: 3
+  displayMode: 2
+  horizontalAlign: 1
+  verticalAlign: 1
+  backgroundColor: {r: 0.013043475, g: 0, b: 0.05, a: 1}
+  toggleKey: 282
+  maxLogEntries: 2000
+  maxHistoryEntries: 64
+  showTimestamp: 1
+  windowChromeFont: {fileID: 12800000, guid: 7c3f9b1a4e6d2c8f5b9a7e3d1c2f4a6b, type: 3}

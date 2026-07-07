@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4a8c2e19b3d5476a9f0e1d2c3b4a5f6, type: 3}
+  m_Name: RatatuiNotepadConfig
+  m_EditorClassIdentifier: RatatuiUnity.Samples.Notepad::RatatuiUnity.Samples.Notepad.RatatuiNotepadConfig
+  cols: 100
+  rows: 28
+  fontSize: 1.6
+  sizingMode: 3
+  displayMode: 2
+  horizontalAlign: 1
+  verticalAlign: 1
+  windowStartMaximized: 0
+  backgroundColor: {r: 0.0196, g: 0.0235, b: 0.0314, a: 1}
+  toggleKey: 293
+  windowChromeFont: {fileID: 12800000, guid: 7c3f9b1a4e6d2c8f5b9a7e3d1c2f4a6b, type: 3}
